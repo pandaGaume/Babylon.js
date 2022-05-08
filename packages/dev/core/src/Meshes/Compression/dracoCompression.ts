@@ -6,6 +6,7 @@ import type { IDisposable } from "../../scene";
 import { VertexData } from "../../Meshes/mesh.vertexData";
 
 declare let DracoDecoderModule: any;
+declare let DracoEncoderModule: any;
 declare let WebAssembly: any;
 
 // WorkerGlobalScope
@@ -19,6 +20,16 @@ function createDecoderAsync(wasmBinary?: ArrayBuffer): Promise<any> {
         });
     });
 }
+
+function createEncoderAsync(wasmBinary?: ArrayBuffer): Promise<any> {
+    return new Promise((resolve) => {
+        DracoEncoderModule({ wasmBinary: wasmBinary }).then((module: any) => {
+            resolve({ module: module });
+        });
+    });
+}
+
+function encodeMesh(encoderModule: any): void {}
 
 function decodeMesh(
     decoderModule: any,
@@ -142,15 +153,17 @@ function decodeMesh(
  */
 function worker(): void {
     let decoderPromise: PromiseLike<any> | undefined;
+    let encoderPromise: PromiseLike<any> | undefined;
 
     onmessage = (event) => {
         const data = event.data;
         switch (data.id) {
             case "init": {
-                const decoder = data.decoder;
-                if (decoder.url) {
-                    importScripts(decoder.url);
-                    decoderPromise = DracoDecoderModule({ wasmBinary: decoder.wasmBinary });
+                const codec = data.codec;
+                if (codec.urls) {
+                    importScripts(codec.urls);
+                    decoderPromise = DracoDecoderModule({ wasmBinary: codec.wasmBinaries[0] });
+                    encoderPromise = DracoEncoderModule({ wasmBinary: codec.wasmBinaries[1] });
                 }
                 postMessage("done");
                 break;
@@ -175,8 +188,35 @@ function worker(): void {
                 });
                 break;
             }
+            case "encodeMesh": {
+                if (!encoderPromise) {
+                    throw new Error("Draco decoder module is not available");
+                }
+                encoderPromise.then((decoder) => {
+                    encodeMesh(decoder);
+                    postMessage("done");
+                });
+                break;
+            }
         }
     };
+}
+
+export interface IDracoCompressionCodecConfiguration {
+    /**
+     * The url to the WebAssembly module.
+     */
+    wasmUrl?: string;
+
+    /**
+     * The url to the WebAssembly binary.
+     */
+    wasmBinaryUrl?: string;
+
+    /**
+     * The url to the fallback JavaScript module.
+     */
+    fallbackUrl?: string;
 }
 
 /**
@@ -184,36 +224,19 @@ function worker(): void {
  */
 export interface IDracoCompressionConfiguration {
     /**
+     * Configuration for the encoder.
+     */
+    encoder: IDracoCompressionCodecConfiguration;
+    /**
      * Configuration for the decoder.
      */
-    decoder: {
-        /**
-         * The url to the WebAssembly module.
-         */
-        wasmUrl?: string;
-
-        /**
-         * The url to the WebAssembly binary.
-         */
-        wasmBinaryUrl?: string;
-
-        /**
-         * The url to the fallback JavaScript module.
-         */
-        fallbackUrl?: string;
-    };
+    decoder: IDracoCompressionCodecConfiguration;
 }
 
 /**
  * Draco compression (https://google.github.io/draco/)
  *
  * This class wraps the Draco module.
- *
- * **Encoder**
- *
- * The encoder is not currently implemented.
- *
- * **Decoder**
  *
  * By default, the configuration points to a copy of the Draco decoder files for glTF from the babylon.js preview cdn https://preview.babylonjs.com/draco_wasm_wrapper_gltf.js.
  *
@@ -224,13 +247,24 @@ export interface IDracoCompressionConfiguration {
  *             wasmUrl: "<url to the WebAssembly library>",
  *             wasmBinaryUrl: "<url to the WebAssembly binary>",
  *             fallbackUrl: "<url to the fallback JavaScript library>",
+ *         },
+ *         encoder: {
+ *             wasmUrl: "<url to the WebAssembly library>",
+ *             wasmBinaryUrl: "<url to the WebAssembly binary>",
+ *             fallbackUrl: "<url to the fallback JavaScript library>",
  *         }
  *     };
  * ```
  *
- * Draco has two versions, one for WebAssembly and one for JavaScript. The decoder configuration can be set to only support WebAssembly or only support the JavaScript version.
- * Decoding will automatically fallback to the JavaScript version if WebAssembly version is not configured or if WebAssembly is not supported by the browser.
- * Use `DracoCompression.DecoderAvailable` to determine if the decoder configuration is available for the current context.
+ * Draco has two versions, one for WebAssembly and one for JavaScript. The codecs configuration can be set to only support WebAssembly or only support the JavaScript version.
+ * Encoding or Decoding will automatically fallback to the JavaScript version if WebAssembly version is not configured or if WebAssembly is not supported by the browser.
+ * Use `DracoCompression.DecoderAvailable` and `DracoCompression.EncoderAvailable` to determine if the codec configuration is available for the current context.
+ *
+ * **Encoder**
+ *
+ *
+ * **Decoder**
+ *
  *
  * To decode Draco compressed data, get the default DracoCompression object and call decodeMeshAsync:
  * ```javascript
@@ -240,8 +274,7 @@ export interface IDracoCompressionConfiguration {
  * @see https://www.babylonjs-playground.com/#N3EK4B#0
  */
 export class DracoCompression implements IDisposable {
-    private _workerPoolPromise?: Promise<AutoReleaseWorkerPool>;
-    private _decoderModulePromise?: Promise<any>;
+    private static wasmBaseUrl: string = "https://preview.babylonjs.com/";
 
     /**
      * The configuration. Defaults to the following urls:
@@ -251,9 +284,14 @@ export class DracoCompression implements IDisposable {
      */
     public static Configuration: IDracoCompressionConfiguration = {
         decoder: {
-            wasmUrl: "https://preview.babylonjs.com/draco_wasm_wrapper_gltf.js",
-            wasmBinaryUrl: "https://preview.babylonjs.com/draco_decoder_gltf.wasm",
-            fallbackUrl: "https://preview.babylonjs.com/draco_decoder_gltf.js",
+            wasmUrl: DracoCompression.wasmBaseUrl + "draco_wasm_wrapper_gltf.js",
+            wasmBinaryUrl: DracoCompression.wasmBaseUrl + "draco_decoder_gltf.wasm",
+            fallbackUrl: DracoCompression.wasmBaseUrl + "draco_decoder_gltf.js",
+        },
+        encoder: {
+            wasmUrl: DracoCompression.wasmBaseUrl + "draco_encoder_wrapper.js",
+            wasmBinaryUrl: DracoCompression.wasmBaseUrl + "draco_encoder.wasm",
+            fallbackUrl: DracoCompression.wasmBaseUrl + "draco_encoder.js",
         },
     };
 
@@ -261,8 +299,18 @@ export class DracoCompression implements IDisposable {
      * Returns true if the decoder configuration is available.
      */
     public static get DecoderAvailable(): boolean {
-        const decoder = DracoCompression.Configuration.decoder;
-        return !!((decoder.wasmUrl && decoder.wasmBinaryUrl && typeof WebAssembly === "object") || decoder.fallbackUrl);
+        return DracoCompression._isCodecAvailable(DracoCompression.Configuration.decoder);
+    }
+
+    /**
+     * Returns true if the decoder configuration is available.
+     */
+    public static get EncoderAvailable(): boolean {
+        return DracoCompression._isCodecAvailable(DracoCompression.Configuration.encoder);
+    }
+
+    private static _isCodecAvailable(codec: IDracoCompressionCodecConfiguration) {
+        return !!((codec.wasmUrl && codec.wasmBinaryUrl && typeof WebAssembly === "object") || codec.fallbackUrl);
     }
 
     /**
@@ -292,13 +340,17 @@ export class DracoCompression implements IDisposable {
         return DracoCompression._Default;
     }
 
+    private _workerPoolPromise?: Promise<AutoReleaseWorkerPool>;
+    private _decoderModulePromise?: Promise<any>;
+    private _encoderModulePromise?: Promise<any>;
+
     /**
      * Constructor
      * @param numWorkers The number of workers for async operations. Specify `0` to disable web workers and run synchronously in the current context.
      */
     constructor(numWorkers = DracoCompression.DefaultNumWorkers) {
+        // decoder configuration
         const decoder = DracoCompression.Configuration.decoder;
-
         const decoderInfo: { url: string | undefined; wasmBinaryPromise: Promise<ArrayBuffer | string | undefined> } =
             decoder.wasmUrl && decoder.wasmBinaryUrl && typeof WebAssembly === "object"
                 ? {
@@ -310,9 +362,29 @@ export class DracoCompression implements IDisposable {
                       wasmBinaryPromise: Promise.resolve(undefined),
                   };
 
+        // encoder configuration
+        const encoder = DracoCompression.Configuration.encoder;
+        const encoderInfo: { url: string | undefined; wasmBinaryPromise: Promise<ArrayBuffer | string | undefined> } =
+            encoder.wasmUrl && encoder.wasmBinaryUrl && typeof WebAssembly === "object"
+                ? {
+                      url: Tools.GetAbsoluteUrl(encoder.wasmUrl),
+                      wasmBinaryPromise: Tools.LoadFileAsync(Tools.GetAbsoluteUrl(encoder.wasmBinaryUrl)),
+                  }
+                : {
+                      url: Tools.GetAbsoluteUrl(encoder.fallbackUrl!),
+                      wasmBinaryPromise: Promise.resolve(undefined),
+                  };
+
+        // may we use worker ??
         if (numWorkers && typeof Worker === "function") {
-            this._workerPoolPromise = decoderInfo.wasmBinaryPromise.then((decoderWasmBinary) => {
-                const workerContent = `${decodeMesh}(${worker})()`;
+            // push the infos into an array to process a single worker initialization
+            const codecInfos: { urls: Array<string | undefined>; wasmBinaryPromises: Array<Promise<ArrayBuffer | string | undefined>> } = {
+                urls: [decoderInfo.url, encoderInfo.url],
+                wasmBinaryPromises: [decoderInfo.wasmBinaryPromise, encoderInfo.wasmBinaryPromise],
+            };
+
+            this._workerPoolPromise = Promise.all(codecInfos.wasmBinaryPromises).then((codecWasmBinaries) => {
+                const workerContent = `${encodeMesh}${decodeMesh}(${worker})()`;
                 const workerBlobUrl = URL.createObjectURL(new Blob([workerContent], { type: "application/javascript" }));
 
                 return new AutoReleaseWorkerPool(numWorkers, () => {
@@ -335,24 +407,33 @@ export class DracoCompression implements IDisposable {
                         worker.addEventListener("error", onError);
                         worker.addEventListener("message", onMessage);
 
+                        // we post initialization message with the array of url and wasm binary
                         worker.postMessage({
                             id: "init",
-                            decoder: {
-                                url: decoderInfo.url,
-                                wasmBinary: decoderWasmBinary,
+                            codec: {
+                                urls: codecInfos.urls,
+                                wasmBinaries: codecWasmBinaries,
                             },
                         });
                     });
                 });
             });
         } else {
+            // note: duplicate the code for better reading.
             this._decoderModulePromise = decoderInfo.wasmBinaryPromise.then((decoderWasmBinary) => {
                 if (!decoderInfo.url) {
                     throw new Error("Draco decoder module is not available");
                 }
-
                 return Tools.LoadScriptAsync(decoderInfo.url).then(() => {
                     return createDecoderAsync(decoderWasmBinary as ArrayBuffer);
+                });
+            });
+            this._encoderModulePromise = encoderInfo.wasmBinaryPromise.then((encoderWasmBinary) => {
+                if (!encoderInfo.url) {
+                    throw new Error("Draco encoder module is not available");
+                }
+                return Tools.LoadScriptAsync(encoderInfo.url).then(() => {
+                    return createEncoderAsync(encoderWasmBinary as ArrayBuffer);
                 });
             });
         }
@@ -370,6 +451,7 @@ export class DracoCompression implements IDisposable {
 
         delete this._workerPoolPromise;
         delete this._decoderModulePromise;
+        delete this._encoderModulePromise;
     }
 
     /**
@@ -385,7 +467,21 @@ export class DracoCompression implements IDisposable {
             return this._decoderModulePromise.then(() => {});
         }
 
+        if (this._encoderModulePromise) {
+            return this._encoderModulePromise.then(() => {});
+        }
+
         return Promise.resolve();
+    }
+
+    /**
+     * Encode vertex data with Draco .
+     * @param data The vertex data to be compressed
+     * @returns A promise that resolves with the encoded vertex data
+     */
+    public encodeMeshAsync(data: VertexData): Promise<VertexData> {
+        // NOT IMPLEMENTED
+        return Promise.resolve(data);
     }
 
     /**
