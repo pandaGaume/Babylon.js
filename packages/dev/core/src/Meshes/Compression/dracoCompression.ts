@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { Tools } from "../../Misc/tools";
 import { AutoReleaseWorkerPool } from "../../Misc/workerPool";
-import type { Nullable } from "../../types";
+import type { FloatArray, IndicesArray, Nullable } from "../../types";
 import type { IDisposable } from "../../scene";
-import { VertexData } from "../../Meshes/mesh.vertexData";
+import { VertexBuffer } from "../../Buffers/buffer";
+import { VertexData, IGetSetVerticesData } from "../../Meshes/mesh.vertexData";
 
 declare let DracoDecoderModule: any;
 declare let DracoEncoderModule: any;
@@ -29,7 +30,179 @@ function createEncoderAsync(wasmBinary?: ArrayBuffer): Promise<any> {
     });
 }
 
-function encodeMesh(encoderModule: any): void {}
+export enum EncoderMethod {
+    EDGEBREAKER = 1,
+    SEQUENTIAL = 0,
+}
+
+enum AttributeEnum {
+    POSITION = "POSITION",
+    NORMAL = "NORMAL",
+    COLOR = "COLOR",
+    TEX_COORD = "TEX_COORD",
+    GENERIC = "GENERIC",
+}
+
+const DEFAULT_QUANTIZATION_BITS = {
+    [AttributeEnum.POSITION]: 14,
+    [AttributeEnum.NORMAL]: 10,
+    [AttributeEnum.COLOR]: 8,
+    [AttributeEnum.TEX_COORD]: 12,
+    [AttributeEnum.GENERIC]: 12,
+};
+
+export interface IDracoEncodedPrimitive {
+    numVertices: number;
+    numIndices: number;
+    data: Uint8Array;
+    attributeIDs: { [key: string]: number };
+}
+
+export interface IDracoEncoderOptions {
+    // indicates how to tune the encoder regarding decode speed (0 gives better speed but worst quality)
+    decodeSpeed?: number;
+    // indicates how to tune the encoder parameters (0 gives better speed but worst quality)
+    encodeSpeed?: number;
+    method?: EncoderMethod;
+    // indicates the presision of each type of data stored in the draco file
+    quantizationBits?: { [key: string]: number };
+    // indicate we should export normals if present
+    exportNormals?: boolean;
+    // indicate we should export texture coordinates if present
+    exportUvs?: boolean;
+    // indicate we should export colors if present
+    exportColors?: boolean;
+}
+
+const DEFAULT_ENCODER_OPTIONS: IDracoEncoderOptions = {
+    decodeSpeed: 5,
+    encodeSpeed: 5,
+    method: EncoderMethod.EDGEBREAKER,
+    quantizationBits: DEFAULT_QUANTIZATION_BITS,
+    exportNormals: true,
+    exportUvs: true,
+    exportColors: false,
+};
+
+function constants() {
+    return {
+        encodeMeshMethod: "encodeMesh",
+        encodeMeshResult: "encodeMeshResult",
+        PositionKind: "position",
+        NormalKind: "normal",
+        UVKind: "uv",
+        UV2Kind: "uv2",
+        UV3Kind: "uv3",
+        UV4Kind: "uv4",
+        UV5Kind: "uv5",
+        UV6Kind: "uv6",
+        ColorKind: "color",
+        nativeAttributeTypes: ["POSITION", "NORMAL", "COLOR", "TEX_COORD", "GENERIC"],
+    };
+}
+
+function encodeMesh(
+    encoderModule: any,
+    getIndices: () => Nullable<IndicesArray>,
+    getVerticesData: (kind: string) => Nullable<FloatArray>,
+    options: IDracoEncoderOptions,
+    destination?: ArrayBuffer
+): Nullable<IDracoEncodedPrimitive> {
+    const internalWorkerConstants = constants();
+    let indices = getIndices();
+    const vertices = getVerticesData(internalWorkerConstants.PositionKind);
+
+    if (indices?.length && vertices?.length) {
+        const encoder = new encoderModule.Encoder();
+        const meshBuilder = new encoderModule.MeshBuilder();
+        const dracoMesh = new encoderModule.Mesh();
+        const attributeIDs: { [key: string]: number } = {};
+
+        try {
+            const verticesCount = vertices.length / 3;
+
+            const prepareAttribute = (kind: string, attribute: any, numComponent: number, items?: Nullable<FloatArray>) => {
+                items = items ?? getVerticesData(kind);
+                const numItems = items?.length;
+                if (numItems) {
+                    if (!(items instanceof Float32Array)) {
+                        items = Float32Array.from(items!);
+                    }
+                    // AddFloatAttributeToMesh is deprecated and call AddFloatAttribute
+                    // see https://github.com/google/draco/blob/master/src/draco/javascript/emscripten/encoder_webidl_wrapper.cc
+                    // According to https://github.com/google/draco/blob/ee2c2578a170324bffef38cb8a3c2e60d89d5e87/src/draco/javascript/emscripten/encoder_webidl_wrapper.h#L86
+                    // the third parameter IS THE VERTICE COUNT, and must be similar for all the subsequent AddXXXAttribute call.
+                    attributeIDs[kind] = meshBuilder.AddFloatAttribute(dracoMesh, attribute, verticesCount, numComponent, items);
+                    const att = internalWorkerConstants.nativeAttributeTypes[attribute];
+                    if (options.quantizationBits && options.quantizationBits[att]) {
+                        encoder.SetAttributeQuantization(attribute, options.quantizationBits[att]);
+                    }
+                }
+            };
+
+            prepareAttribute(internalWorkerConstants.PositionKind, encoderModule.POSITION, 3, vertices);
+
+            if (options.exportNormals) {
+                prepareAttribute(internalWorkerConstants.NormalKind, encoderModule.NORMAL, 3);
+            }
+
+            if (options.exportUvs) {
+                prepareAttribute(internalWorkerConstants.UVKind, encoderModule.TEX_COORD, 2);
+                prepareAttribute(internalWorkerConstants.UV2Kind, encoderModule.TEX_COORD, 2);
+                prepareAttribute(internalWorkerConstants.UV3Kind, encoderModule.TEX_COORD, 2);
+                prepareAttribute(internalWorkerConstants.UV4Kind, encoderModule.TEX_COORD, 2);
+                prepareAttribute(internalWorkerConstants.UV5Kind, encoderModule.TEX_COORD, 2);
+                prepareAttribute(internalWorkerConstants.UV6Kind, encoderModule.TEX_COORD, 2);
+            }
+
+            if (options.exportColors) {
+                prepareAttribute(internalWorkerConstants.ColorKind, encoderModule.COLOR, 4);
+            }
+
+            const numFaces = indices.length / 3;
+            if (!(indices instanceof Uint32Array) && !(indices instanceof Uint16Array)) {
+                indices = (verticesCount > 65535 ? Uint32Array : Uint16Array).from(indices!);
+            }
+            meshBuilder.AddFacesToMesh(dracoMesh, numFaces, indices);
+
+            // options
+            if (options.method === 0 /*EncoderMethod.SEQUENTIAL*/) {
+                encoder.SetEncodingMethod(encoderModule.MESH_SEQUENTIAL_ENCODING);
+            } else if (options.method === 1 /*EncoderMethod.EDGEBREAKER*/) {
+                encoder.SetEncodingMethod(encoderModule.MESH_EDGEBREAKER_ENCODING);
+            } else {
+                throw "unsuported Draco encoder method. Should be 0 for SEQUENTIAL or 1 for EDGEBREAKER";
+            }
+
+            encoder.SetSpeedOptions(options.encodeSpeed, options.decodeSpeed);
+
+            const encodedNativeBuffer = new encoderModule.DracoInt8Array();
+            try {
+                const encodedLength = encoder.EncodeMeshToDracoBuffer(dracoMesh, encodedNativeBuffer);
+
+                // destination is giving us the ability to reuse the input buffer which is not longer used.
+                // remember that he ArrayBuffer object is fixed-length so also ensure the provided buffer is large enought..
+                const availableBytes = destination ? destination.byteLength : 0;
+                const buffer = availableBytes < encodedLength ? new ArrayBuffer(encodedLength) : destination!;
+                const encodedData = new Uint8Array(buffer, 0, encodedLength);
+                for (let i = 0; i < encodedLength; i++) {
+                    encodedData[i] = encodedNativeBuffer.GetValue(i);
+                }
+
+                const nv = encoder.GetNumberOfEncodedPoints();
+                const ni = encoder.GetNumberOfEncodedFaces() * 3;
+                return { numVertices: nv, numIndices: ni, data: encodedData, attributeIDs: attributeIDs };
+            } finally {
+                encoderModule.destroy(encodedNativeBuffer);
+            }
+        } finally {
+            encoderModule.destroy(meshBuilder);
+            encoderModule.destroy(dracoMesh);
+            encoderModule.destroy(encoder);
+        }
+    }
+    return null;
+}
 
 function decodeMesh(
     decoderModule: any,
@@ -155,14 +328,17 @@ function worker(): void {
     let decoderPromise: PromiseLike<any> | undefined;
     let encoderPromise: PromiseLike<any> | undefined;
 
+    const internalWorkerConstants = constants();
+
     onmessage = (event) => {
         const data = event.data;
         switch (data.id) {
             case "init": {
                 const codec = data.codec;
                 if (codec.urls) {
-                    importScripts(codec.urls);
+                    importScripts(codec.urls[0]);
                     decoderPromise = DracoDecoderModule({ wasmBinary: codec.wasmBinaries[0] });
+                    importScripts(codec.urls[1]);
                     encoderPromise = DracoEncoderModule({ wasmBinary: codec.wasmBinaries[1] });
                 }
                 postMessage("done");
@@ -188,13 +364,44 @@ function worker(): void {
                 });
                 break;
             }
-            case "encodeMesh": {
+            case internalWorkerConstants.encodeMeshMethod: {
                 if (!encoderPromise) {
                     throw new Error("Draco decoder module is not available");
                 }
-                encoderPromise.then((decoder) => {
-                    encodeMesh(decoder);
-                    postMessage("done");
+
+                encoderPromise.then((encoder) => {
+                    const verticesData = data.verticesData;
+
+                    const getVerticesData = (kind: string): Nullable<FloatArray> => {
+                        switch (kind) {
+                            case internalWorkerConstants.PositionKind:
+                                return verticesData.positions;
+                            case internalWorkerConstants.NormalKind:
+                                return verticesData.normals;
+                            case internalWorkerConstants.UVKind:
+                                return verticesData.uvs;
+                            case internalWorkerConstants.UV2Kind:
+                                return verticesData.uvs2;
+                            case internalWorkerConstants.UV3Kind:
+                                return verticesData.uvs3;
+                            case internalWorkerConstants.UV4Kind:
+                                return verticesData.uvs4;
+                            case internalWorkerConstants.UV5Kind:
+                                return verticesData.uvs5;
+                            case internalWorkerConstants.UV6Kind:
+                                return verticesData.uvs6;
+                            case internalWorkerConstants.ColorKind:
+                                return verticesData.colors;
+                            default:
+                                return null;
+                        }
+                    };
+
+                    const getIndices = (): Nullable<IndicesArray> => {
+                        return verticesData.indices;
+                    };
+                    const result = encodeMesh(encoder, getIndices, getVerticesData, data.options, verticesData.buffer);
+                    postMessage({ id: internalWorkerConstants.encodeMeshResult, encodedData: result }, result ? [result.data.buffer] : undefined);
                 });
                 break;
             }
@@ -219,6 +426,8 @@ export interface IDracoCompressionCodecConfiguration {
     fallbackUrl?: string;
 }
 
+export interface IDracoCompressionEncoderConfiguration extends IDracoCompressionCodecConfiguration {}
+
 /**
  * Configuration for Draco compression
  */
@@ -226,7 +435,7 @@ export interface IDracoCompressionConfiguration {
     /**
      * Configuration for the encoder.
      */
-    encoder: IDracoCompressionCodecConfiguration;
+    encoder: IDracoCompressionEncoderConfiguration;
     /**
      * Configuration for the decoder.
      */
@@ -277,10 +486,16 @@ export class DracoCompression implements IDisposable {
     private static wasmBaseUrl: string = "https://preview.babylonjs.com/";
 
     /**
-     * The configuration. Defaults to the following urls:
+     * The configuration. Defaults are :
+     * **Decoder**
      * - wasmUrl: "https://preview.babylonjs.com/draco_wasm_wrapper_gltf.js"
      * - wasmBinaryUrl: "https://preview.babylonjs.com/draco_decoder_gltf.wasm"
      * - fallbackUrl: "https://preview.babylonjs.com/draco_decoder_gltf.js"
+     *
+     * **Encoder**
+     * - wasmUrl: "https://preview.babylonjs.com/draco_encoder_wrapper.js"
+     * - wasmBinaryUrl: "https://preview.babylonjs.com/draco_encoder.wasm"
+     * - fallbackUrl: "https://preview.babylonjs.com/draco_encoder.js"
      */
     public static Configuration: IDracoCompressionConfiguration = {
         decoder: {
@@ -296,14 +511,14 @@ export class DracoCompression implements IDisposable {
     };
 
     /**
-     * Returns true if the decoder configuration is available.
+     * Returns true if the decoder is available.
      */
     public static get DecoderAvailable(): boolean {
         return DracoCompression._isCodecAvailable(DracoCompression.Configuration.decoder);
     }
 
     /**
-     * Returns true if the decoder configuration is available.
+     * Returns true if the encoder is available.
      */
     public static get EncoderAvailable(): boolean {
         return DracoCompression._isCodecAvailable(DracoCompression.Configuration.encoder);
@@ -384,7 +599,7 @@ export class DracoCompression implements IDisposable {
             };
 
             this._workerPoolPromise = Promise.all(codecInfos.wasmBinaryPromises).then((codecWasmBinaries) => {
-                const workerContent = `${encodeMesh}${decodeMesh}(${worker})()`;
+                const workerContent = `${constants}${encodeMesh}${decodeMesh}(${worker})()`;
                 const workerBlobUrl = URL.createObjectURL(new Blob([workerContent], { type: "application/javascript" }));
 
                 return new AutoReleaseWorkerPool(numWorkers, () => {
@@ -476,12 +691,63 @@ export class DracoCompression implements IDisposable {
 
     /**
      * Encode vertex data with Draco .
-     * @param data The vertex data to be compressed
-     * @returns A promise that resolves with the encoded vertex data
+     * @param input The vertex data to be compressed
+     * @param options The encoding options
+     * @param avoidWorker tell the codec to do not use the worker pool to perform the encoding.
+     * @returns A promise that resolves with the encoded primitives
      */
-    public encodeMeshAsync(data: VertexData): Promise<VertexData> {
-        // NOT IMPLEMENTED
-        return Promise.resolve(data);
+    public encodeMeshAsync(input: IGetSetVerticesData, options: IDracoEncoderOptions, avoidWorker: boolean = false): Promise<Nullable<IDracoEncodedPrimitive>> {
+        const o = { ...DEFAULT_ENCODER_OPTIONS, ...options } as Required<IDracoEncoderOptions>;
+        o.quantizationBits = { ...DEFAULT_QUANTIZATION_BITS, ...o.quantizationBits };
+
+        if (this._workerPoolPromise && !avoidWorker) {
+            return this._workerPoolPromise.then((workerPool) => {
+                return new Promise<Nullable<IDracoEncodedPrimitive>>((resolve, reject) => {
+                    workerPool.push((worker, onComplete) => {
+                        const internalWorkerConstants = constants();
+
+                        const onError = (error: ErrorEvent) => {
+                            // this is where we gona call reject
+                            worker.removeEventListener("error", onError);
+                            worker.removeEventListener("message", onMessage);
+                            reject(error);
+                            onComplete();
+                        };
+
+                        const onMessage = (message: MessageEvent) => {
+                            if (message.data.id === internalWorkerConstants.encodeMeshResult) {
+                                // this is where we gona call resolve
+                                worker.removeEventListener("error", onError);
+                                worker.removeEventListener("message", onMessage);
+                                resolve(message.data.encodedData);
+                                onComplete();
+                            }
+                        };
+
+                        worker.addEventListener("error", onError);
+                        worker.addEventListener("message", onMessage);
+
+                        // we build a dedicated copy of indices and verticesData backed by a Transferable buffer
+                        const inputCopy = VerticesDataTransferable.from(input);
+                        worker.postMessage({ id: internalWorkerConstants.encodeMeshMethod, verticesData: inputCopy, options: o }, [inputCopy.buffer]);
+                    });
+                });
+            });
+        }
+
+        // If worker are not supported
+        if (this._encoderModulePromise) {
+            return this._encoderModulePromise.then((encoder) => {
+                return encodeMesh(
+                    encoder.module,
+                    () => input.getIndices(),
+                    (kind: string) => input.getVerticesData(kind),
+                    o
+                );
+            });
+        }
+
+        throw new Error("Draco encoder module is not available");
     }
 
     /**
@@ -561,4 +827,69 @@ export class DracoCompression implements IDisposable {
 
         throw new Error("Draco decoder module is not available");
     }
+}
+
+/**
+ * used to transfert the necessary data to the worker, avoiding copy by using a unique Transferable buffer
+ */
+class VerticesDataTransferable {
+    public static from(input: IGetSetVerticesData) {
+        const target = new VerticesDataTransferable();
+
+        const indices = input.getIndices();
+        const il = indices ? indices.length : 0;
+
+        const positions = input.getVerticesData(VertexBuffer.PositionKind);
+        const pl = positions ? positions.length : 0;
+
+        const normals = input.getVerticesData(VertexBuffer.NormalKind);
+        const nl = normals ? normals.length : 0;
+
+        const uvs = input.getVerticesData(VertexBuffer.UVKind);
+        const uvl = uvs ? uvs.length : 0;
+
+        const byteSize = (il + pl + nl + uvl) * 4;
+        target.buffer = new ArrayBuffer(byteSize);
+        let offsetBytes = 0;
+        if (indices) {
+            target.indices = new Uint32Array(target.buffer, 0, il);
+            target.indices.set(indices);
+            offsetBytes += il * 4;
+        }
+        if (positions) {
+            target.positions = new Float32Array(target.buffer, offsetBytes, pl);
+            target.positions.set(positions);
+            offsetBytes += pl * 4;
+        }
+        if (normals) {
+            target.normals = new Float32Array(target.buffer, offsetBytes, nl);
+            target.normals.set(normals);
+            offsetBytes += nl * 4;
+        }
+        if (uvs) {
+            target.uvs = new Float32Array(target.buffer, offsetBytes, uvl);
+            target.uvs.set(uvs);
+            offsetBytes += uvl * 4;
+        }
+        target.uvs2 = null;
+        target.uvs3 = null;
+        target.uvs4 = null;
+        target.uvs5 = null;
+        target.uvs6 = null;
+        target.colors = null;
+
+        return target;
+    }
+
+    buffer: ArrayBuffer;
+    positions: Nullable<Float32Array>;
+    indices: Nullable<Uint32Array>;
+    normals: Nullable<Float32Array>;
+    uvs: Nullable<Float32Array>;
+    uvs2: Nullable<Float32Array>;
+    uvs3: Nullable<Float32Array>;
+    uvs4: Nullable<Float32Array>;
+    uvs5: Nullable<Float32Array>;
+    uvs6: Nullable<Float32Array>;
+    colors: Nullable<Float32Array>;
 }
