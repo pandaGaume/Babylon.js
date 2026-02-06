@@ -1,7 +1,6 @@
 // Babylonjs
 import type { Mesh, SubMesh } from "core/Meshes";
-import { InstancedMesh } from "core/Meshes/instancedMesh";
-import { VertexBuffer } from "core/Buffers/buffer";
+import type { InstancedMesh } from "core/Meshes/instancedMesh";
 
 // 3MF
 import { IncrementalIdFactory } from "./core/model/3mf.utils";
@@ -22,15 +21,17 @@ import type { I3mfVertexData } from "./core/model/3mf.types";
  */
 export interface IThreeMfSerializerOptions {
     /**  */
-    exportInstances: boolean;
+    exportInstances?: boolean;
     /**  */
-    exportSubmeshes: boolean;
+    exportSubmeshes?: boolean;
 }
 
 /**
  *
  */
 export class ThreeMfSerializer {
+    private static _PositionKind = "position";
+
     /**
      *
      */
@@ -60,7 +61,7 @@ export class ThreeMfSerializer {
      * @param meshes
      * @returns
      */
-    public async toMemoryAsync(meshes: Array<Mesh | InstancedMesh>): Promise<Uint8Array | undefined> {
+    public async serializeToMemoryAsync(meshes: Array<Mesh | InstancedMesh>): Promise<Uint8Array | undefined> {
         const chunks = new Array<Uint8Array>();
         let size = 0;
         const sink = function (err: any, chunk: Uint8Array, _final: boolean) {
@@ -68,19 +69,22 @@ export class ThreeMfSerializer {
             size += chunk.length;
         };
         await this.serializeAsync(meshes, sink);
-        const buffer = new Uint8Array(size);
-        let off = 0;
-        for (const c of chunks) {
-            buffer.set(c, off);
-            off += c.length;
+        if (size) {
+            const buffer = new Uint8Array(size);
+            let off = 0;
+            for (const c of chunks) {
+                buffer.set(c, off);
+                off += c.length;
+            }
+            return buffer;
         }
-        return buffer;
+        return undefined;
     }
 
     /**
-     *
-     * @param meshes
-     * @param sink
+     * Generic 3MF binary serializer.
+     * @param meshes the meshes to serialize.
+     * @param sink we use sink to acumulate chunk of data into a target. This let's the opportunity to stream the output without storing huge amount of memory.
      */
     public async serializeAsync(meshes: Array<Mesh | InstancedMesh>, sink: (err: any, chunk: Uint8Array, final: boolean) => void): Promise<void> {
         const lib = await this._ensureZipLibReadyAsync();
@@ -101,11 +105,12 @@ export class ThreeMfSerializer {
                 target.add(entry);
                 const sink = makeByteSinkFromFflateEntry(entry);
                 const w = new Utf8XmlWriterToBytes(sink);
-                const b = new XmlBuilder(w).dec("1.0", "UTF-8");
+                const b = new XmlBuilder(w).dec("1.0", "UTF-8", true);
                 const s = new XmlSerializer(b);
                 s.serialize(object);
                 w.finish();
             };
+
             const doc = this.toDocument(meshes);
             if (doc) {
                 const target = new zip(sink);
@@ -139,12 +144,11 @@ export class ThreeMfSerializer {
         const instances: Array<InstancedMesh> | null = this._o.exportInstances ? [] : null;
 
         for (let j = 0; j < meshes.length; j++) {
-            const babylonMesh = meshes[j];
-            if (babylonMesh instanceof InstancedMesh) {
-                instances?.push(<InstancedMesh>babylonMesh);
+            if (meshes[j].isAnInstance) {
+                instances?.push(meshes[j] as InstancedMesh);
                 continue;
             }
-
+            const babylonMesh = meshes[j] as Mesh;
             const objectName = babylonMesh.name || `mesh${j}`;
             const subMeshes = babylonMesh.subMeshes;
             // into 3MF Submeshes are important because they may carry color information...
@@ -165,7 +169,7 @@ export class ThreeMfSerializer {
                 }
             } else {
                 const data = {
-                    positions: babylonMesh.getVerticesData(VertexBuffer.PositionKind) || [],
+                    positions: babylonMesh.getVerticesData(ThreeMfSerializer._PositionKind) || [],
                     indices: babylonMesh.getIndices() || [],
                 };
                 const object = new ThreeMfMeshBuilder(idFactory.next()).withPostProcessHandlers(this._handleBjsTo3mfVertexTransform).withData(data).withName(objectName).build();
@@ -230,7 +234,7 @@ export class ThreeMfSerializer {
             return undefined;
         }
 
-        const allPos = mesh.getVerticesData(VertexBuffer.PositionKind);
+        const allPos = mesh.getVerticesData(ThreeMfSerializer._PositionKind);
         if (!allPos) {
             return undefined;
         }

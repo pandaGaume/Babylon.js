@@ -1,4 +1,5 @@
 import { type IQualifiedName, XmlNameToParts, type IXmlBuilder, type XmlName, GetXmlName, ToQualifiedString, GetXmlFieldMeta } from "./xml.interfaces";
+import type { IXmlSerializerFormatOptions } from "./xml.serializer.format";
 
 type Primitive = string | number | boolean | bigint | Date;
 
@@ -35,6 +36,8 @@ export class XmlSerializer {
     static DECIMALS = 6;
 
     /** */
+    private _format?: IXmlSerializerFormatOptions;
+    /** */
     private _builder: IXmlBuilder;
     /** */
     private _ns: Map<string, string> = new Map<string, string>();
@@ -44,9 +47,14 @@ export class XmlSerializer {
     /**
      *
      * @param builder
+     * @param format
      */
-    public constructor(builder: IXmlBuilder) {
+    public constructor(builder: IXmlBuilder, format?: IXmlSerializerFormatOptions) {
         this._builder = builder;
+        this._format = format;
+        if (!this._format) {
+            return;
+        }
     }
 
     /**
@@ -192,7 +200,7 @@ export class XmlSerializer {
 
     private _fmt(n: number, decimals: number, eps: number): string {
         if (!Number.isFinite(n)) {
-            throw new Error("Non-finite number in geometry");
+            throw new Error("Non-finite number.");
         }
 
         // clamp tiny values to 0 to kill 1e-19 and also -0
