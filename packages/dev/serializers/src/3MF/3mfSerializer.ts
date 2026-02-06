@@ -60,7 +60,7 @@ export class ThreeMfSerializer {
         const index = new Map<Mesh | SubMesh, I3mfObject>();
 
         // first pass to build every model from mesh - keep it simple
-        let instances: Array<InstancedMesh> | null = this._o.exportInstances ? [] : null;
+        const instances: Array<InstancedMesh> | null = this._o.exportInstances ? [] : null;
 
         for (let j = 0; j < meshes.length; j++) {
             const babylonMesh = meshes[j];
@@ -104,19 +104,16 @@ export class ThreeMfSerializer {
             // group the instance per mesh, then the xml will be more readable with a Components container per mesh.
             const grouped = this._groupBy(instances, (i) => i.sourceMesh);
 
-            for (const group of grouped) {
-                const babylonMesh = group[0];
-                instances = group[1];
-
-                if (instances && instances.length) {
+            for (const [_babylonMesh, _instances] of Array.from(grouped.entries())) {
+                if (_instances && _instances.length) {
                     const cb = new ThreeMfComponentsBuilder(idFactory.next());
 
-                    for (let j = 0; j < instances.length; j++) {
-                        const mesh = instances[j];
+                    for (let j = 0; j < _instances.length; j++) {
+                        const mesh = _instances[j];
                         const worldTransform = mesh.getWorldMatrix();
 
                         // process sub meshes
-                        const subMeshes = babylonMesh.subMeshes;
+                        const subMeshes = _babylonMesh.subMeshes;
                         if (this._o.exportSubmeshes && subMeshes && subMeshes.length > 0) {
                             for (let k = 0; k < subMeshes.length; k++) {
                                 const subMesh = subMeshes[k];
@@ -133,7 +130,7 @@ export class ThreeMfSerializer {
                             continue;
                         }
 
-                        const objectRef = index.get(babylonMesh);
+                        const objectRef = index.get(_babylonMesh);
                         if (objectRef) {
                             // we build a single component
                             cb.withComponent(objectRef.id, this._handleBjsTo3mfMatrixTransformToRef(worldTransform, Matrix3d.Zero()));

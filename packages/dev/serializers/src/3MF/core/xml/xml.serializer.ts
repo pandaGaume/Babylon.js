@@ -79,8 +79,8 @@ export class XmlSerializer {
         this._gatherNamespaces(root, new WeakSet<object>());
 
         const doc = this._builder.ele(null, currentName.name);
-        for (const pair of this._ns) {
-            doc.att("xmlns", pair[1], pair[0]);
+        for (const [v, n] of Array.from(this._ns.entries())) {
+            doc.att("xmlns", n, v);
         }
         this._writeObjectContent(doc, root as Record<string, unknown>, new WeakSet<object>().add(root));
         this._builder.end();
@@ -294,7 +294,7 @@ export class XmlSerializer {
         let value: string;
         do {
             value = `ns${this._prefixCount++}`;
-            for (const v of this._ns.values()) {
+            for (const v of Array.from(this._ns.values())) {
                 if (v === value) {
                     alreadyReferenced = true;
                     break;
