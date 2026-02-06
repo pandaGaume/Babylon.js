@@ -1,4 +1,4 @@
-import { XmlAttr, XmlName, XmlNumber } from "../xml/xml.interfaces";
+import { XmlAttr, XmlName } from "../xml/xml.interfaces";
 import type {
     I3mfBase,
     I3mfBaseMaterials,
@@ -230,9 +230,6 @@ export class ThreeMfVertices implements I3mfVertices {
     vertex: Array<I3mfVertex> = [];
 }
 
-const EPS = 1e-9; // below this, treat as zero
-const DECIMALS = 5; // or whatever "reasonable" means for your pipeline
-
 /**
  *
  */
@@ -242,21 +239,18 @@ export class ThreeMfVertex implements I3mfVertex {
      *
      */
     @XmlAttr({ name: "x" })
-    @XmlNumber({ decimals: DECIMALS, eps: EPS })
     x: ST_Number;
 
     /**
      *
      */
     @XmlAttr({ name: "y" })
-    @XmlNumber({ decimals: DECIMALS, eps: EPS })
     y: ST_Number;
 
     /**
      *
      */
     @XmlAttr({ name: "z" })
-    @XmlNumber({ decimals: DECIMALS, eps: EPS })
     z: ST_Number;
 
     public constructor(x: ST_Number = 0, y: ST_Number = 0, z: ST_Number = 0) {

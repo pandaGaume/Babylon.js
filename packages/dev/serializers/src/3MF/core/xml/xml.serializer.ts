@@ -1,5 +1,5 @@
 import { type IQualifiedName, XmlNameToParts, type IXmlBuilder, type XmlName, GetXmlName, ToQualifiedString, GetXmlFieldMeta } from "./xml.interfaces";
-import type { IXmlSerializerFormatOptions } from "./xml.serializer.format";
+import { type IXmlSerializerFormatOptions, FormatNumberXml } from "./xml.serializer.format";
 
 type Primitive = string | number | boolean | bigint | Date;
 
@@ -167,9 +167,11 @@ export class XmlSerializer {
                         switch (m.kind) {
                             case "attr": {
                                 let vStr: string | null = null;
-                                if (propMetas.length > 1 && IsNumber(value)) {
-                                    const mn = propMetas.find((m) => m.kind === "number");
-                                    vStr = this._fmt(value, mn?.decimals ?? XmlSerializer.DECIMALS, mn?.eps ?? XmlSerializer.EPS);
+                                if (IsNumber(value)) {
+                                    if (this._format?.number) {
+                                        vStr = FormatNumberXml(value, this._format?.number);
+                                    }
+                                    vStr = this._fmt(value, XmlSerializer.DECIMALS, XmlSerializer.EPS);
                                 }
 
                                 vStr = vStr ?? value.toString();

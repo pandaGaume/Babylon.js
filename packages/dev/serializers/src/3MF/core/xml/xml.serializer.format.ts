@@ -52,7 +52,7 @@ export interface IXmlSerializerFormatOptions {
  * @param opts
  * @returns
  */
-function FormatNumberXml(x: number, opts: IXmlSerializerNumberOptions): string {
+export function FormatNumberXml(x: number, opts: IXmlSerializerNumberOptions): string {
     if (!Number.isFinite(x)) {
         throw new Error(`Cannot format non-finite number: ${x}`);
     }

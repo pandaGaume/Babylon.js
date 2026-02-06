@@ -25,7 +25,7 @@ export function IsQualifiedName(x: unknown): x is { name: string } {
 
 export type XmlName = string | IQualifiedName;
 
-type FieldKind = "attr" | "elem" | "number" | "none";
+type FieldKind = "attr" | "elem" | "none";
 
 type FieldMeta = {
     kind: FieldKind;
@@ -68,14 +68,6 @@ export function XmlIgnore() {
  */
 export function XmlAttr(opts?: { name: XmlName }) {
     return (target: any, prop: string) => AddXmlMeta(target, { kind: "attr", prop, ...opts });
-}
-
-/**
- * tell the serializer to serialize the number with specifig=c decimale
- * @returns
- */
-export function XmlNumber(opts?: { decimals: number; eps: number }) {
-    return (target: any, prop: string) => AddXmlMeta(target, { kind: "number", prop, ...opts });
 }
 
 /**
