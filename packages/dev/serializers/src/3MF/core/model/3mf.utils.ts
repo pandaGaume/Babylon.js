@@ -1,4 +1,4 @@
-import type { ST_ResourceID } from "../model";
+import type { ST_ResourceID } from "./3mf.interfaces";
 
 /**
  *

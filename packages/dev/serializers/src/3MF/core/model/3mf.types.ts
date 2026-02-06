@@ -10,19 +10,19 @@ export interface I3mfVertexData {
     /**
      * An array of the x, y, z position of each vertex  [...., x, y, z, .....]
      */
-    positions: ThreeMfFloatArray;
+    positions: ThreeMfFloatArray | null;
     /**
      * An array of i, j, k the three vertex indices required for each triangular facet  [...., i, j, k .....]
      */
-    indices: ThreeMfIndicesArray;
+    indices: ThreeMfIndicesArray | null;
     /**
      * An array of the x, y, z normal vector of each vertex  [...., x, y, z, .....]
      */
-    normals?: ThreeMfFloatArray;
+    normals?: ThreeMfFloatArray | null;
     /**
      * An array of the r, g, b, a, color of each vertex  [...., r, g, b, a, .....]
      */
-    colors?: ThreeMfFloatArray;
+    colors?: ThreeMfFloatArray | null;
 }
 
 /**

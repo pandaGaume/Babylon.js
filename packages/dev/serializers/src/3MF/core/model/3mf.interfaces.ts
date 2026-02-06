@@ -179,7 +179,7 @@ export interface I3mfObject {
     /**
      *
      */
-    id?: ST_ResourceID;
+    id: ST_ResourceID;
 
     /**
      *

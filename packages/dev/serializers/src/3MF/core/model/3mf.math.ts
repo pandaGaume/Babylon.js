@@ -22,6 +22,14 @@ export class Matrix3d {
 
     /**
      *
+     * @returns
+     */
+    public static Zero() {
+        return new Matrix3d([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    /**
+     *
      * @param tx
      * @param ty
      * @param tz

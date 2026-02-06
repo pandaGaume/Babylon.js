@@ -145,7 +145,7 @@ export class ThreeMfObject implements I3mfObject {
      *
      */
     @XmlAttr({ name: "id" })
-    id?: ST_ResourceID;
+    id: ST_ResourceID;
 
     /**
      *
@@ -193,7 +193,7 @@ export class ThreeMfObject implements I3mfObject {
      */
     content?: I3mfMesh | I3mfComponents;
 
-    public constructor(id?: ST_ResourceID, type = ST_ObjectType.model) {
+    public constructor(id: ST_ResourceID, type = ST_ObjectType.model) {
         this.id = id;
         this.type = type;
     }

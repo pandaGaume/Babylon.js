@@ -1,6 +1,7 @@
 import { XmlAttr, XmlName } from "../xml/xml.interfaces";
+import type { I3mfModel } from "./3mf.interfaces";
 import { OpenXmlContentTypesNamespace, OpenXmlRelationshipsNamespace } from "./3mf.opc.interfaces";
-import type { I3mfContentTypes, I3mfContentType, I3mfRelationships, I3mfRelationship } from "./3mf.opc.interfaces";
+import type { I3mfContentTypes, I3mfContentType, I3mfRelationships, I3mfRelationship, I3mfDocument } from "./3mf.opc.interfaces";
 
 /**
  *
@@ -79,4 +80,15 @@ export class ThreeMfRelationship implements I3mfRelationship {
         this.type = type;
         this.target = target;
     }
+}
+
+/**
+ *
+ */
+export class ThreeMfDocument implements I3mfDocument {
+    public constructor(
+        public contentTypes: I3mfContentTypes,
+        public relationships: I3mfRelationships,
+        public model: I3mfModel
+    ) {}
 }

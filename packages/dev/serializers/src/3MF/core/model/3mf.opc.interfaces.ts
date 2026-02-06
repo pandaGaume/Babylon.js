@@ -1,3 +1,5 @@
+import type { I3mfModel } from "./3mf.interfaces";
+
 export const OpenXmlContentTypesNamespace = "http://schemas.openxmlformats.org/package/2006/content-types";
 export const OpenXmlRelationshipsNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
 
@@ -136,4 +138,22 @@ export interface I3mfRelationship {
      *
      */
     target?: string;
+}
+
+/**
+ *
+ */
+export interface I3mfDocument {
+    /**
+     *
+     */
+    contentTypes: I3mfContentTypes;
+    /**
+     *
+     */
+    relationships: I3mfRelationships;
+    /**
+     *
+     */
+    model: I3mfModel;
 }
