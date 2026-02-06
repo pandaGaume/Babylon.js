@@ -1,7 +1,3 @@
-// BABYLON
-import type { IGetSetVerticesData } from "core/Meshes";
-import { Constants } from "core/Engines/constants";
-
 // 3MF
 import type { FloatArray, IndicesArray, Nullable } from "core/types";
 import {
@@ -20,6 +16,7 @@ import {
 import type { I3mfMesh, I3mfMetadata, I3mfObject, I3mfTriangle, I3mfTriangles, I3mfVertex, I3mfVertices, ST_ResourceID, ST_Unit } from "./3mf.interfaces";
 import { ST_ObjectType } from "./3mf.interfaces";
 import type { Matrix3d } from "./3mf.matrix";
+import type { IVertexData } from "./3mf.data";
 
 export type VertexHandler = (vertex: I3mfVertex) => I3mfVertex;
 export type TriangleHandler = (triangle: I3mfTriangle) => I3mfTriangle;
@@ -68,7 +65,7 @@ export class ThreeMfMeshObjectBuilder {
      * @param data
      * @returns
      */
-    withData(data: IGetSetVerticesData): ThreeMfMeshObjectBuilder {
+    withData(data: IVertexData): ThreeMfMeshObjectBuilder {
         this._object.content = this._buildMesh(data);
         return this;
     }
@@ -95,9 +92,9 @@ export class ThreeMfMeshObjectBuilder {
      * @param data
      * @returns
      */
-    private _buildMesh(data: IGetSetVerticesData): I3mfMesh {
-        const vertices = this._buildVertices(data.getVerticesData(Constants.PositionKind));
-        const triangles = this._buildTriangle(data.getIndices());
+    private _buildMesh(data: IVertexData): I3mfMesh {
+        const vertices = this._buildVertices(data.positions);
+        const triangles = this._buildTriangle(data.indices);
         return new ThreeMfMesh(vertices, triangles);
     }
 
