@@ -23,7 +23,7 @@ import type {
     ST_UriReference,
 } from "./3mf.interfaces";
 import { ST_Unit, ThreeDimModelNamespace, ST_ObjectType } from "./3mf.interfaces";
-import type { Matrix3d } from "./3mf.matrix";
+import type { Matrix3d } from "./3mf.math";
 
 /**
  *

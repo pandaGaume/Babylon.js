@@ -1,3 +1,5 @@
+import type { I3mfRGBAColor } from "./3mf.types";
+
 /* eslint-disable @typescript-eslint/naming-convention */
 
 /**
@@ -42,4 +44,26 @@ export class Matrix3d {
     public toString(): string {
         return this.values.join(" ");
     }
+}
+
+/**
+ *
+ * @param c
+ * @returns
+ */
+export function RgbaToHex(c: I3mfRGBAColor | { r: number; g: number; b: number; a?: number }): string {
+    const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+    const toHex2 = (v: number) => clampByte(v).toString(16).padStart(2, "0").toUpperCase();
+
+    const r = toHex2(c.r);
+    const g = toHex2(c.g);
+    const b = toHex2(c.b);
+
+    if (typeof (c as any).a === "number") {
+        const aVal = (c as any).a as number;
+        const aByte = aVal <= 1 ? clampByte(aVal * 255) : clampByte(aVal);
+        return `#${r}${g}${b}${toHex2(aByte)}`;
+    }
+
+    return `#${r}${g}${b}`;
 }

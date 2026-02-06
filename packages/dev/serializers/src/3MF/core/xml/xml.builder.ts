@@ -1,5 +1,4 @@
 /* eslint-disable babylonjs/available */
-import type { Nullable } from "core/types";
 import type { IXmlBuilder } from "./xml.interfaces";
 
 /**
@@ -92,7 +91,7 @@ export class XmlBuilder implements IXmlBuilder {
         return this;
     }
 
-    public att(ns: Nullable<string>, n: string, v: string): IXmlBuilder {
+    public att(ns: string | null, n: string, v: string): IXmlBuilder {
         const ctx = this._peekContext();
         if (!ctx) {
             throw new Error("att() without open element");
@@ -137,7 +136,7 @@ export class XmlBuilder implements IXmlBuilder {
         return this;
     }
 
-    public ele(ns: Nullable<string>, n: string): IXmlBuilder {
+    public ele(ns: string | null, n: string): IXmlBuilder {
         let ctx = this._peekContext();
         if (ctx) {
             this._closeOpenTagIfNeeded(ctx);
@@ -220,7 +219,7 @@ export class XmlBuilder implements IXmlBuilder {
         return this._escText(s).replace(/"/g, "&quot;").replace(/'/g, "&apos;");
     }
 
-    private _isXmlnsDecl(ns: Nullable<string>, n: string): boolean {
+    private _isXmlnsDecl(ns: string | null, n: string): boolean {
         if (ns) {
             return ns === XmlSyntax.Xmlns;
         }

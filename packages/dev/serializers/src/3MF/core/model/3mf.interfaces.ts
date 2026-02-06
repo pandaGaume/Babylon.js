@@ -1,4 +1,4 @@
-import type { Matrix3d } from "./3mf.matrix";
+import type { Matrix3d } from "./3mf.math";
 
 export const ThreeDimModelNamespace = "http://schemas.microsoft.com/3dmanufacturing/core/2015/02";
 export const TriangleSetsNamespace = "http://schemas.microsoft.com/3dmanufacturing/trianglesets/2021/07";

@@ -1,6 +1,7 @@
 // 3MF
-import type { FloatArray, IndicesArray, Nullable } from "core/types";
 import {
+    ThreeMfBase,
+    ThreeMfBaseMaterials,
     ThreeMfBuild,
     ThreeMfItem,
     ThreeMfMesh,
@@ -13,10 +14,11 @@ import {
     ThreeMfVertex,
     ThreeMfVertices,
 } from "./3mf";
-import type { I3mfMesh, I3mfMetadata, I3mfObject, I3mfTriangle, I3mfTriangles, I3mfVertex, I3mfVertices, ST_ResourceID, ST_Unit } from "./3mf.interfaces";
+import type { I3mfBaseMaterials, I3mfMesh, I3mfMetadata, I3mfObject, I3mfTriangle, I3mfTriangles, I3mfVertex, I3mfVertices, ST_ResourceID, ST_Unit } from "./3mf.interfaces";
 import { ST_ObjectType } from "./3mf.interfaces";
-import type { Matrix3d } from "./3mf.matrix";
-import type { IVertexData } from "./3mf.data";
+import { RgbaToHex } from "./3mf.math";
+import type { Matrix3d } from "./3mf.math";
+import type { I3mfRGBAColor, I3mfVertexData, ThreeMfFloatArray, ThreeMfIndicesArray } from "./3mf.types";
 
 export type VertexHandler = (vertex: I3mfVertex) => I3mfVertex;
 export type TriangleHandler = (triangle: I3mfTriangle) => I3mfTriangle;
@@ -65,8 +67,20 @@ export class ThreeMfMeshObjectBuilder {
      * @param data
      * @returns
      */
-    withData(data: IVertexData): ThreeMfMeshObjectBuilder {
+    withData(data: I3mfVertexData): ThreeMfMeshObjectBuilder {
         this._object.content = this._buildMesh(data);
+        return this;
+    }
+
+    /**
+     *
+     * @param id
+     * @param i
+     * @returns
+     */
+    withMaterial(id: ST_ResourceID, i: number): ThreeMfMeshObjectBuilder {
+        this._object.pid = id;
+        this._object.pindex = i;
         return this;
     }
 
@@ -92,13 +106,13 @@ export class ThreeMfMeshObjectBuilder {
      * @param data
      * @returns
      */
-    private _buildMesh(data: IVertexData): I3mfMesh {
+    private _buildMesh(data: I3mfVertexData): I3mfMesh {
         const vertices = this._buildVertices(data.positions);
         const triangles = this._buildTriangle(data.indices);
         return new ThreeMfMesh(vertices, triangles);
     }
 
-    private _buildVertices(p: Nullable<FloatArray>): I3mfVertices {
+    private _buildVertices(p: ThreeMfFloatArray): I3mfVertices {
         const container = new ThreeMfVertices();
         if (p) {
             for (let i = 0; i < p.length; ) {
@@ -116,7 +130,7 @@ export class ThreeMfMeshObjectBuilder {
         return container;
     }
 
-    private _buildTriangle(indice: Nullable<IndicesArray>): I3mfTriangles {
+    private _buildTriangle(indice: ThreeMfIndicesArray): I3mfTriangles {
         const container = new ThreeMfTriangles();
         if (indice) {
             for (let i = 0; i < indice.length; ) {
@@ -132,6 +146,43 @@ export class ThreeMfMeshObjectBuilder {
             }
         }
         return container;
+    }
+}
+
+/**
+ *
+ */
+export class ThreeMfMaterialBuilder {
+    private _m: I3mfBaseMaterials;
+
+    public constructor(id: ST_ResourceID) {
+        this._m = new ThreeMfBaseMaterials(id);
+    }
+
+    /**
+     *
+     * @param name
+     * @param color
+     * @returns
+     */
+    public withColor(name: string, color: I3mfRGBAColor): ThreeMfMaterialBuilder {
+        this._m.base = this._m.base ?? [];
+        let m = this._m.base.find((m) => m.name.toLowerCase() === name.toLowerCase());
+        if (m) {
+            m.displaycolor = RgbaToHex(color);
+            return this;
+        }
+        m = new ThreeMfBase(name, RgbaToHex(color));
+        this._m.base.push(m);
+        return this;
+    }
+
+    /**
+     *
+     * @returns
+     */
+    public build(): I3mfBaseMaterials {
+        return this._m;
     }
 }
 
@@ -169,6 +220,23 @@ export class ThreeMfModelBuilder {
         //const isKnownMeta = (s: string): boolean => TMFBuilder.knownMetaSet.has(s.toLowerCase());
         //const qn:IQName = xmlNameToParts(name);
         this._model.metadata.push(new ThreeMfMeta(name, value, preserve, type));
+        return this;
+    }
+
+    /**
+     *
+     * @param material
+     * @returns
+     */
+    public withMaterial(material: I3mfBaseMaterials | ThreeMfMaterialBuilder): ThreeMfModelBuilder {
+        if (material instanceof ThreeMfMaterialBuilder) {
+            material = material.build();
+        }
+        if (material) {
+            this._model.resources = this._model.resources ?? new ThreeMfResources();
+            this._model.resources.basematerials = this._model.resources.basematerials ?? [];
+            this._model.resources.basematerials.push(material);
+        }
         return this;
     }
 

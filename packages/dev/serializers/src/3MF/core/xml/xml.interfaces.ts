@@ -1,5 +1,3 @@
-import type { Nullable } from "core/types";
-
 /** */
 export interface IQualifiedName {
     /** */
@@ -11,8 +9,8 @@ export interface IQualifiedName {
 /** */
 export interface IXmlBuilder {
     dec(version: string, encoding?: string, standalone?: boolean): IXmlBuilder;
-    att(ns: Nullable<string>, n: string, v: string): IXmlBuilder;
-    ele(ns: Nullable<string>, n: string): IXmlBuilder;
+    att(ns: string | null, n: string, v: string): IXmlBuilder;
+    ele(ns: string | null, n: string): IXmlBuilder;
     text(txt: string): IXmlBuilder;
     end(): IXmlBuilder;
 }
