@@ -6,9 +6,16 @@ import { VertexBuffer } from "core/Buffers/buffer";
 // 3MF
 import { IncrementalIdFactory } from "./core/model/3mf.utils";
 import { ThreeMfComponentsBuilder, ThreeMfDocumentBuilder, ThreeMfMeshBuilder, ThreeMfModelBuilder } from "./core/model/3mf.builder";
-import type { I3mfDocument, I3mfObject, I3mfVertex, I3mfVertexData } from "./core/model";
+import { ContentTypeFileName, ModelFileName, Object3dDirName, RelationshipDirName, RelationshipFileName, type I3mfDocument } from "./core/model/3mf.opc.interfaces";
 import { Matrix3d } from "./core/model/3mf.math";
 import { Matrix } from "core/Maths/math";
+import { Tools } from "core/Misc/tools";
+import { ThreeMfSerializerGlobalConfiguration } from "./3mfSerializer.configuration";
+import { XmlBuilder } from "./core/xml/xml.builder";
+import { XmlSerializer } from "./core/xml/xml.serializer";
+import { type ByteSink, Utf8XmlWriterToBytes } from "./core/xml/xml.builder.bytes";
+import type { I3mfObject, I3mfVertex } from "./core/model/3mf.interfaces";
+import type { I3mfVertexData } from "./core/model/3mf.types";
 
 /**
  *
@@ -46,6 +53,75 @@ export class ThreeMfSerializer {
      */
     public get options(): Readonly<IThreeMfSerializerOptions> {
         return this._o;
+    }
+
+    /**
+     *
+     * @param meshes
+     * @returns
+     */
+    public async toMemoryAsync(meshes: Array<Mesh | InstancedMesh>): Promise<Uint8Array | undefined> {
+        const chunks = new Array<Uint8Array>();
+        let size = 0;
+        const sink = function (err: any, chunk: Uint8Array, _final: boolean) {
+            chunks.push(chunk);
+            size += chunk.length;
+        };
+        await this.serializeAsync(meshes, sink);
+        const buffer = new Uint8Array(size);
+        let off = 0;
+        for (const c of chunks) {
+            buffer.set(c, off);
+            off += c.length;
+        }
+        return buffer;
+    }
+
+    /**
+     *
+     * @param meshes
+     * @param sink
+     */
+    public async serializeAsync(meshes: Array<Mesh | InstancedMesh>, sink: (err: any, chunk: Uint8Array, final: boolean) => void): Promise<void> {
+        const lib = await this._ensureZipLibReadyAsync();
+        if (lib) {
+            const zip = lib.Zip;
+            const zipDeflate = lib.ZipDeflate;
+
+            if (!zip || !zipDeflate) {
+                throw new Error("fflate Zip / ZipDeflate not available");
+            }
+
+            const makeByteSinkFromFflateEntry = function (entry: any): ByteSink {
+                return { push: (chunk: any, final: any) => entry.push(chunk, final) };
+            };
+
+            const serializeEntry = function (target: any, name: string, object: any) {
+                const entry = new zipDeflate(name, { level: 6 });
+                target.add(entry);
+                const sink = makeByteSinkFromFflateEntry(entry);
+                const w = new Utf8XmlWriterToBytes(sink);
+                const b = new XmlBuilder(w).dec("1.0", "UTF-8");
+                const s = new XmlSerializer(b);
+                s.serialize(object);
+                w.finish();
+            };
+            const doc = this.toDocument(meshes);
+            if (doc) {
+                const target = new zip(sink);
+
+                // save the root content type
+                serializeEntry(target, ContentTypeFileName, doc.contentTypes);
+
+                // save the relationships
+                serializeEntry(target, `${RelationshipDirName}${RelationshipFileName}`, doc.relationships);
+
+                // save the model
+                serializeEntry(target, `${Object3dDirName}${ModelFileName}`, doc.model);
+
+                target.end();
+            }
+        }
     }
 
     /**
@@ -222,5 +298,26 @@ export class ThreeMfSerializer {
         // 3MF order: m00 m01 m02 m10 m11 m12 m20 m21 m22 m30 m31 m32
         ref.values = [a[0], a[4], a[8], a[1], a[5], a[9], a[2], a[6], a[10], a[3], a[7], a[11]];
         return ref;
+    }
+
+    private _fflateReadyPromise?: Promise<any>;
+
+    private async _ensureZipLibReadyAsync(): Promise<any> {
+        if (this._fflateReadyPromise) {
+            return await this._fflateReadyPromise;
+        }
+
+        this._fflateReadyPromise = (async () => {
+            // globalThis is the glogal object whatever the environment : ie windows
+            const g = globalThis as any;
+
+            if (!g.fflate) {
+                await Tools.LoadScriptAsync(ThreeMfSerializerGlobalConfiguration.FFLATEUrl);
+            }
+
+            return g.fflate;
+        })();
+
+        return await this._fflateReadyPromise;
     }
 }
