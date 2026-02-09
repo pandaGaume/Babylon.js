@@ -1,3 +1,4 @@
+import { IFormatter, IXmlSerializerFormatOptions, NumberFormatter } from "../xml";
 import type { I3mfRGBAColor } from "./3mf.types";
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -16,29 +17,9 @@ export class Matrix3d {
      *
      * @returns
      */
-    public static Identity() {
-        return new Matrix3d([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
-    }
-
-    /**
-     *
-     * @returns
-     */
     public static Zero() {
         return new Matrix3d([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
-
-    /**
-     *
-     * @param tx
-     * @param ty
-     * @param tz
-     * @returns
-     */
-    public static Translate(tx: number, ty: number, tz: number) {
-        return new Matrix3d([1, 0, 0, 0, 1, 0, 0, 0, 1, tx, ty, tz]);
-    }
-
     /**
      *
      * @param values
@@ -54,23 +35,38 @@ export class Matrix3d {
     }
 }
 
+export class  MatrixFormatter implements IFormatter<Matrix3d> {
+    
+    _f:NumberFormatter;
+
+    public constructor(public o:IXmlSerializerFormatOptions){
+        this._f = new NumberFormatter(o);
+    }
+
+    public toString(x: Matrix3d): string {
+        return x.values.map(v=>this._f.toString(v)).join(" ");
+    }
+}
+
+
 /**
  *
  * @param c
  * @returns
  */
 export function RgbaToHex(c: I3mfRGBAColor | { r: number; g: number; b: number; a?: number }): string {
-    const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
-    const toHex2 = (v: number) => clampByte(v).toString(16).padStart(2, "0").toUpperCase();
+    const toSRGB = (c: number) => Math.round(Math.min(255, Math.max(0, Math.pow(c, 1 / 2.2) * 255)));
 
-    const r = toHex2(c.r);
-    const g = toHex2(c.g);
-    const b = toHex2(c.b);
+    const r = toSRGB(c.r).toString(16).padStart(2, "0").toUpperCase();
+    const g = toSRGB(c.g).toString(16).padStart(2, "0").toUpperCase();
+    const b = toSRGB(c.b).toString(16).padStart(2, "0").toUpperCase();
 
     if (typeof (c as any).a === "number") {
-        const aVal = (c as any).a as number;
-        const aByte = aVal <= 1 ? clampByte(aVal * 255) : clampByte(aVal);
-        return `#${r}${g}${b}${toHex2(aByte)}`;
+        const a = Math.round(Math.min(255, Math.max(0, c.a! * 255)))
+            .toString(16)
+            .padStart(2, "0")
+            .toUpperCase();
+        return `#${r}${g}${b}${a}`;
     }
 
     return `#${r}${g}${b}`;

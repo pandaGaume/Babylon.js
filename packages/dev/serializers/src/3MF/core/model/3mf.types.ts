@@ -44,5 +44,5 @@ export interface I3mfRGBAColor {
     /**
      *
      */
-    a: number;
+    a?: number;
 }

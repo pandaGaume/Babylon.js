@@ -28,6 +28,7 @@ import type {
     I3mfVertex,
     I3mfVertices,
     ST_ResourceID,
+    ST_ResourceIndex,
     ST_Unit,
 } from "./3mf.interfaces";
 import { ST_ObjectType } from "./3mf.interfaces";
@@ -88,11 +89,24 @@ export class ThreeMfObjectBuilder {
 
     /**
      *
+     * @param id
+     * @param index
+     * @returns
+     */
+    public withProperty( id: ST_ResourceIndex, index:number = 0): ThreeMfObjectBuilder {
+        this._object.pid = id;
+        this._object.id = index;
+        return this;
+    }
+
+    /**
+     *
      * @returns
      */
     public build(): I3mfObject {
         return this._object;
     }
+
 
     /**
      *
