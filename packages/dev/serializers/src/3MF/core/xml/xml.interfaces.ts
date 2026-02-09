@@ -1,4 +1,4 @@
-import { IXmlSerializerFormatOptions } from "./xml.serializer.format";
+import type { IXmlSerializerFormatOptions } from "./xml.serializer.format";
 
 /** */
 export interface IQualifiedName {
@@ -17,7 +17,6 @@ export interface IXmlBuilder {
     end(): IXmlBuilder;
 }
 
-
 /**
  * @param x
  * @returns
@@ -30,8 +29,11 @@ export type XmlName = string | IQualifiedName;
 
 type FieldKind = "attr" | "elem" | "none";
 
+/**
+ *
+ */
 export interface IFormatter<T = any> {
-  toString(value: T): string;
+    toString(value: T): string;
 }
 
 export type FormatterCtor<T> = new (args: IXmlSerializerFormatOptions) => IFormatter<T>;
@@ -41,7 +43,7 @@ type FieldMeta = {
     prop: string;
     name?: XmlName;
     ignore?: boolean;
-    formatter?:FormatterCtor<any>;
+    formatter?: FormatterCtor<any>;
 };
 
 const XML_CLASS_META = Symbol("__xml:meta$__");
@@ -74,7 +76,7 @@ export function XmlIgnore() {
  * tell the serializer to serialize the property as attribute
  * @returns
  */
-export function XmlAttr(opts?: { name: XmlName, formatter?: FormatterCtor<any>  }) {
+export function XmlAttr(opts?: { name: XmlName; formatter?: FormatterCtor<any> }) {
     return (target: any, prop: string) => AddXmlMeta(target, { kind: "attr", prop, ...opts });
 }
 

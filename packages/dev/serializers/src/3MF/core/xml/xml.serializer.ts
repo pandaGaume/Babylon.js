@@ -1,5 +1,5 @@
 import { type IQualifiedName, XmlNameToParts, type IXmlBuilder, type XmlName, GetXmlName, ToQualifiedString, GetXmlFieldMeta } from "./xml.interfaces";
-import { NumberFormatter, resolveFormatOptions, type IXmlSerializerFormatOptions } from "./xml.serializer.format";
+import { NumberFormatter, ResolveFormatOptions, type IXmlSerializerFormatOptions } from "./xml.serializer.format";
 
 type Primitive = string | number | boolean | bigint | Date;
 
@@ -35,7 +35,7 @@ export class XmlSerializer {
     /** */
     private _prefixCount: number = 0;
 
-    private _nFmt?:NumberFormatter ; 
+    private _nFmt?: NumberFormatter;
 
     /**
      *
@@ -44,7 +44,7 @@ export class XmlSerializer {
      */
     public constructor(builder: IXmlBuilder, format?: IXmlSerializerFormatOptions) {
         this._builder = builder;
-        this._format = resolveFormatOptions(format);
+        this._format = ResolveFormatOptions(format);
         this._nFmt = new NumberFormatter(this._format);
     }
 
@@ -137,13 +137,15 @@ export class XmlSerializer {
             arr.push(m);
             metaByProp.set(m.prop, arr);
         }
-        
+
         // ensure the att are processed first, otherwize, the tag might be closed...
         const keys = Object.keys(source).sort((a, b) => {
-                const aHasAttr = (metaByProp.get(a) ?? []).some(m => m.kind === "attr");
-                const bHasAttr = (metaByProp.get(b) ?? []).some(m => m.kind === "attr");
-                if (aHasAttr === bHasAttr) return 0;
-                return aHasAttr ? -1 : 1; // attr d abord
+            const aHasAttr = (metaByProp.get(a) ?? []).some((m) => m.kind === "attr");
+            const bHasAttr = (metaByProp.get(b) ?? []).some((m) => m.kind === "attr");
+            if (aHasAttr === bHasAttr) {
+                return 0;
+            }
+            return aHasAttr ? -1 : 1; // attr d abord
         });
 
         // We decide per property, using metadata if present
@@ -166,10 +168,10 @@ export class XmlSerializer {
                         switch (m.kind) {
                             case "attr": {
                                 let vStr: string | null = null;
-                                if (IsNumber(value) && this._nFmt ) {
+                                if (IsNumber(value) && this._nFmt) {
                                     vStr = this._nFmt.toString(value);
                                 }
-                                if( m.formatter ) {
+                                if (m.formatter) {
                                     // TODO : cache the created formatter to avoid to many allocation.
                                     const f = new m.formatter(this._format);
                                     vStr = f.toString(value);

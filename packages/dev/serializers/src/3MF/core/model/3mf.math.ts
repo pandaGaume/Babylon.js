@@ -1,4 +1,6 @@
-import { IFormatter, IXmlSerializerFormatOptions, NumberFormatter } from "../xml";
+import type { IXmlSerializerFormatOptions } from "../xml/xml.serializer.format";
+import { NumberFormatter } from "../xml/xml.serializer.format";
+import type { IFormatter } from "../xml/xml.interfaces";
 import type { I3mfRGBAColor } from "./3mf.types";
 
 /* eslint-disable @typescript-eslint/naming-convention */
@@ -35,19 +37,23 @@ export class Matrix3d {
     }
 }
 
-export class  MatrixFormatter implements IFormatter<Matrix3d> {
-    
-    _f:NumberFormatter;
+/**
+ *
+ */
+export class MatrixFormatter implements IFormatter<Matrix3d> {
+    /**
+     *
+     */
+    _f: NumberFormatter;
 
-    public constructor(public o:IXmlSerializerFormatOptions){
+    public constructor(public o: IXmlSerializerFormatOptions) {
         this._f = new NumberFormatter(o);
     }
 
     public toString(x: Matrix3d): string {
-        return x.values.map(v=>this._f.toString(v)).join(" ");
+        return x.values.map((v) => this._f.toString(v)).join(" ");
     }
 }
-
 
 /**
  *

@@ -93,7 +93,7 @@ export class ThreeMfObjectBuilder {
      * @param index
      * @returns
      */
-    public withProperty( id: ST_ResourceIndex, index:number = 0): ThreeMfObjectBuilder {
+    public withProperty(id: ST_ResourceIndex, index: number = 0): ThreeMfObjectBuilder {
         this._object.pid = id;
         this._object.id = index;
         return this;
@@ -106,7 +106,6 @@ export class ThreeMfObjectBuilder {
     public build(): I3mfObject {
         return this._object;
     }
-
 
     /**
      *

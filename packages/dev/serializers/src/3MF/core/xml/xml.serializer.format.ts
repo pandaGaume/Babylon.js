@@ -1,4 +1,4 @@
-import { IFormatter } from "./xml.interfaces";
+import type { IFormatter } from "./xml.interfaces";
 
 /**
  *
@@ -63,41 +63,55 @@ export const DefaultXmlSerializerFormatOptions: Readonly<IXmlSerializerFormatOpt
     number: DefaultXmlSerializerNumberOptions,
 });
 
-export function resolveNumberOptions(
-  opts?: IXmlSerializerNumberOptions
-): Required<Omit<IXmlSerializerNumberOptions, "perAttributeEps" | "fixedDecimals" | "maxDecimalsCap" | "trimTrailingZeros" | "allowScientific" | "snapNearZero" | "zeroThreshold">> &
-  Pick<IXmlSerializerNumberOptions, "perAttributeEps" | "fixedDecimals"> & {
-    maxDecimalsCap: number;
-    trimTrailingZeros: boolean;
-    allowScientific: boolean;
-    snapNearZero: boolean;
-    zeroThreshold: number;
-  } {
-  const eps = opts?.eps ?? DefaultXmlSerializerNumberOptions.eps;
+/**
+ *@param opts
+ *@returns
+ */
+export function ResolveNumberOptions(opts?: IXmlSerializerNumberOptions): Required<
+    Omit<IXmlSerializerNumberOptions, "perAttributeEps" | "fixedDecimals" | "maxDecimalsCap" | "trimTrailingZeros" | "allowScientific" | "snapNearZero" | "zeroThreshold">
+> &
+    Pick<IXmlSerializerNumberOptions, "perAttributeEps" | "fixedDecimals"> & {
+        maxDecimalsCap: number;
+        trimTrailingZeros: boolean;
+        allowScientific: boolean;
+        snapNearZero: boolean;
+        zeroThreshold: number;
+    } {
+    const eps = opts?.eps ?? DefaultXmlSerializerNumberOptions.eps;
 
-  return {
-    eps,
-    maxDecimalsCap: opts?.maxDecimalsCap ?? DefaultXmlSerializerNumberOptions.maxDecimalsCap!,
-    trimTrailingZeros: opts?.trimTrailingZeros ?? DefaultXmlSerializerNumberOptions.trimTrailingZeros!,
-    fixedDecimals: opts?.fixedDecimals,
-    allowScientific: opts?.allowScientific ?? DefaultXmlSerializerNumberOptions.allowScientific!,
-    snapNearZero: opts?.snapNearZero ?? DefaultXmlSerializerNumberOptions.snapNearZero!,
-    zeroThreshold: opts?.zeroThreshold ?? eps,
-    perAttributeEps: opts?.perAttributeEps,
-  };
+    return {
+        eps,
+        maxDecimalsCap: opts?.maxDecimalsCap ?? DefaultXmlSerializerNumberOptions.maxDecimalsCap!,
+        trimTrailingZeros: opts?.trimTrailingZeros ?? DefaultXmlSerializerNumberOptions.trimTrailingZeros!,
+        fixedDecimals: opts?.fixedDecimals,
+        allowScientific: opts?.allowScientific ?? DefaultXmlSerializerNumberOptions.allowScientific!,
+        snapNearZero: opts?.snapNearZero ?? DefaultXmlSerializerNumberOptions.snapNearZero!,
+        zeroThreshold: opts?.zeroThreshold ?? eps,
+        perAttributeEps: opts?.perAttributeEps,
+    };
 }
 
-export function resolveFormatOptions(opts?: IXmlSerializerFormatOptions) {
-  return {
-    number: resolveNumberOptions(opts?.number),
-  };
+/**
+ *@param opts
+ *@returns
+ */
+export function ResolveFormatOptions(opts?: IXmlSerializerFormatOptions) {
+    return {
+        number: ResolveNumberOptions(opts?.number),
+    };
 }
 
-export class  NumberFormatter implements IFormatter<number> {
-    
-    _o:IXmlSerializerNumberOptions;
+/**
+ *
+ */
+export class NumberFormatter implements IFormatter<number> {
+    private _o: IXmlSerializerNumberOptions;
 
-    public constructor(public o:IXmlSerializerFormatOptions){
+    /**
+     *
+     * @param o
+     */
+    public constructor(public o: IXmlSerializerFormatOptions) {
         this._o = o.number!;
 
         if (!Number.isFinite(this._o.eps) || this._o.eps <= 0) {
@@ -105,7 +119,13 @@ export class  NumberFormatter implements IFormatter<number> {
         }
     }
 
-    public toString(x: number): string{
+    /**
+     *
+     * @param x
+     * @returns
+     */
+
+    public toString(x: number): string {
         if (!Number.isFinite(x)) {
             throw new Error(`Cannot format non-finite number: ${x}`);
         }
@@ -169,7 +189,7 @@ export class  NumberFormatter implements IFormatter<number> {
 
         return s;
     }
-    
+
     private _clampInt(n: number, min: number, max: number): number {
         if (!Number.isFinite(n)) {
             return min;

@@ -119,7 +119,7 @@ export interface I3mfVertex {
 
 /**
  * 3MF triangle.
- * v1/v2/v3 are indices into the vertices list (<vertices><vertex .../>...</vertices>).
+ * v1/v2/v3 are indices into the vertices list (<vertices> \<vertex .../\>...</vertices>).
  *
  * Property assignment:
  * - pid and p1/p2/p3 are used to assign per-triangle or per-vertex properties (like materials or colors),
@@ -138,21 +138,21 @@ export interface I3mfTriangle {
      * These are indices into the property group's entry list (the group referenced by pid).
      */
     p1?: ST_ResourceIndex;
+    /** */
     p2?: ST_ResourceIndex;
+    /** */
     p3?: ST_ResourceIndex;
 
     /**
      * Property group id for this triangle.
      * If present, it overrides the object-level pid for this specific triangle.
-     *
-     * Note: Typo in the original comment: "riangle" -> "triangle".
      */
     pid?: ST_ResourceID;
 }
 
 /**
  * Container for vertices.
- * Matches the XML structure <vertices><vertex .../>...</vertices>.
+ * Matches the XML structure <vertices>\<vertex .../\>...</vertices>.
  */
 export interface I3mfVertices {
     /** Array of vertices. Order matters because triangles reference indices. */
@@ -161,7 +161,7 @@ export interface I3mfVertices {
 
 /**
  * Container for triangles.
- * Matches the XML structure <triangles><triangle .../>...</triangles>.
+ * Matches the XML structure <triangles>\<triangle .../\>...</triangles>.
  */
 export interface I3mfTriangles {
     /** Array of triangles. */

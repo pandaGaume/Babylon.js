@@ -74,16 +74,15 @@ export abstract class AbstractThreeMfSerializer<T, O extends IThreeMfSerializerO
 
     /**
      * Generic 3MF binary serializer.
-     *
-     * @param meshes the meshes to serialize.
-     * @param sink a callback receiving byte chunks; enables streaming without buffering the full archive in memory.
-     *
      * Pipeline overview:
      * 1. ensureZipLibReadyAsync provides a zip implementation (host-dependent).
      * 2. Convert meshes into an I3mfDocument (OPC parts + model).
      * 3. Create a zip target that streams through the provided sink.
      * 4. Serialize XML parts into zip entries.
      * 5. End the zip stream.
+     * @param sink a callback receiving byte chunks; enables streaming without buffering the full archive in memory.
+     * @param meshes the meshes to serialize.
+     * @returns
      */
     public async serializeAsync(sink: (err: any, chunk: Uint8Array, final: boolean) => void, ...meshes: Array<T>): Promise<void> {
         // The zip library (e.g. fflate) may need dynamic import / polyfills depending on host.
@@ -204,7 +203,7 @@ export abstract class AbstractThreeMfSerializer<T, O extends IThreeMfSerializerO
      * (native, Node.js, browser, etc.).
      *
      * Expected shape (fflate-like):
-     * - return { Zip, ZipDeflate } at minimum.
+     * - return [ Zip, ZipDeflate ] at minimum.
      *
      * Notes:
      * - In a browser, this might require bundler configuration or dynamic import.
