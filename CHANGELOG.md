@@ -1,5 +1,16 @@
 # Changelog
 
+## 8.31.3
+
+### Core
+
+- Fix memory leak when manually disposing effects - [_Bug Fix_] by [deltakosh](https://github.com/deltakosh) ([#17299](https://github.com/BabylonJS/Babylon.js/pull/17299))
+- GPUPicker: BoxPicking Support + Some optimization - by [noname0310](https://github.com/noname0310) ([#17289](https://github.com/BabylonJS/Babylon.js/pull/17289))
+- FrameGraph: Add support for color correction, filter and tonemap post processes - [_New Feature_] by [Popov72](https://github.com/Popov72) ([#17290](https://github.com/BabylonJS/Babylon.js/pull/17290))
+
+### Playground
+
+
 ## 8.31.2
 
 ### Core
@@ -5318,6 +5329,8 @@
 
 - Mesh extrusion: Add an optional scaleVectorFunction parameter to ExtrudeShapeCustom - by [Popov72](https://github.com/Popov72) ([#17752](https://github.com/BabylonJS/Babylon.js/pull/17752))
 
+## 8.50.4
+
 ## 8.50.3
 
 ### Core
@@ -6195,17 +6208,6 @@
 ### Serializers
 
 - Gltf: unofficial _COLOR_0 for EXT_mesh_gpu_instancing - by [kzhsw](https://github.com/kzhsw) ([#17264](https://github.com/BabylonJS/Babylon.js/pull/17264))
-
-## 8.31.3
-
-### Core
-
-- Fix memory leak when manually disposing effects - [_Bug Fix_] by [deltakosh](https://github.com/deltakosh) ([#17299](https://github.com/BabylonJS/Babylon.js/pull/17299))
-- GPUPicker: BoxPicking Support + Some optimization - by [noname0310](https://github.com/noname0310) ([#17289](https://github.com/BabylonJS/Babylon.js/pull/17289))
-- FrameGraph: Add support for color correction, filter and tonemap post processes - [_New Feature_] by [Popov72](https://github.com/Popov72) ([#17290](https://github.com/BabylonJS/Babylon.js/pull/17290))
-
-### Playground
-
 
 ## 6.15.0
 
