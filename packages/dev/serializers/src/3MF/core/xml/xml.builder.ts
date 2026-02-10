@@ -1,4 +1,3 @@
-/* eslint-disable babylonjs/available */
 import type { IXmlBuilder } from "./xml.interfaces";
 
 /**
@@ -17,25 +16,41 @@ export interface IXmlWriter {
 
 /** */
 class XmlSyntax {
+    /** */
     public static OpenTag: string = "<";
+    /** */
     public static CloseTag: string = ">";
+    /** */
     public static Slash: string = "/";
+    /** */
     public static Question: string = "?";
+    /** */
     public static Quote: string = '"';
+    /** */
     public static Equal: string = "=";
+    /** */
     public static Space: string = " ";
+    /** */
     public static Semicolon: string = ":";
 
+    /** */
     public static Dec = "<?xml";
+    /** */
     public static Xml = "xml";
+    /** */
     public static Xmlns = "xmlns";
+    /** */
     public static Xsi = "xsi";
 
+    /** */
     public static VersionKeyword = "version";
+    /** */
     public static EncodingKeyword = "encoding";
+    /** */
     public static StandaloneKeyword = "standalone";
 }
 
+/** */
 export enum TokenType {
     Declaration,
     Tag,
@@ -47,9 +62,13 @@ export enum TokenType {
 export class XmlBuilder implements IXmlBuilder {
     /** */
     static Context = class {
+        /** */
         name: string = "";
+        /** */
         closed: boolean = false;
+        /** */
         lastToken: TokenType | null = null;
+        /** */
         depth: number;
 
         // uri -> prefix
@@ -61,6 +80,11 @@ export class XmlBuilder implements IXmlBuilder {
         // optional: default namespace uri
         defaultNs: string | null = null;
 
+        /**
+         *
+         *@param name
+         *@param depth
+         */
         constructor(name: string, depth: number) {
             this.name = name;
             this.depth = depth;
@@ -78,6 +102,13 @@ export class XmlBuilder implements IXmlBuilder {
         this._w = w;
     }
 
+    /**
+     *
+     * @param version
+     * @param encoding
+     * @param standalone
+     * @returns
+     */
     public dec(version: string, encoding?: string, standalone?: boolean): IXmlBuilder {
         this._w.write(XmlSyntax.Dec);
         this._writeAttStr(XmlSyntax.VersionKeyword, version);
@@ -85,12 +116,19 @@ export class XmlBuilder implements IXmlBuilder {
             this._writeAttStr(XmlSyntax.EncodingKeyword, encoding);
         }
         if (standalone !== undefined) {
-            this._writeAttStr(XmlSyntax.StandaloneKeyword, standalone?"yes":"no");
+            this._writeAttStr(XmlSyntax.StandaloneKeyword, standalone ? "yes" : "no");
         }
         this._w.write(XmlSyntax.Question, XmlSyntax.CloseTag);
         return this;
     }
 
+    /**
+     *
+     * @param ns
+     * @param n
+     * @param v
+     * @returns
+     */
     public att(ns: string | null, n: string, v: string): IXmlBuilder {
         const ctx = this._peekContext();
         if (!ctx) {
@@ -136,6 +174,12 @@ export class XmlBuilder implements IXmlBuilder {
         return this;
     }
 
+    /**
+     *
+     * @param ns
+     * @param n
+     * @returns
+     */
     public ele(ns: string | null, n: string): IXmlBuilder {
         let ctx = this._peekContext();
         if (ctx) {
@@ -151,6 +195,11 @@ export class XmlBuilder implements IXmlBuilder {
         return this;
     }
 
+    /**
+     *
+     * @param txt
+     * @returns
+     */
     public text(txt: string): IXmlBuilder {
         const ctx = this._peekContext();
         if (!ctx) {
@@ -162,6 +211,10 @@ export class XmlBuilder implements IXmlBuilder {
         return this;
     }
 
+    /**
+     *
+     * @returns
+     */
     public end(): IXmlBuilder {
         const ctx = this._popContext();
         if (ctx) {

@@ -12,22 +12,13 @@ export interface IResourceIdFactory {
  *
  */
 export class IncrementalIdFactory implements IResourceIdFactory {
-    /**
-     *
-     */
+    /** */
     _from: number;
-    /**
-     *
-     */
+    /** */
     _to: number;
-    /**
-     *
-     */
+    /** */
     _step: number;
-
-    /**
-     *
-     */
+    /** */
     _i: number;
 
     /**
@@ -65,4 +56,3 @@ export class IncrementalIdFactory implements IResourceIdFactory {
         return this;
     }
 }
-
