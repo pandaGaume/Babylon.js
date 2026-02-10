@@ -2028,6 +2028,7 @@ export class Scene implements IAnimatable, IClipPlanesHolder, IAssetContainer {
         if (engine.getCreationOptions().useLargeWorldRendering || options?.useFloatingOrigin) {
             OverrideMatrixFunctions();
             this._floatingOriginScene = this;
+            FloatingOriginCurrentScene.getScene = this._getFloatingOriginScene;
         }
 
         this._uid = null;
