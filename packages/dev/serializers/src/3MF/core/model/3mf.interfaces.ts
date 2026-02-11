@@ -1,5 +1,3 @@
-import type { Matrix3d } from "./3mf.math";
-
 /**
  * XML namespace for the core 3MF model schema.
  * This is the default namespace used by <model> and most standard 3MF elements.
@@ -27,6 +25,20 @@ export enum ST_Unit {
     inch = "inch",
     foot = "foot",
     meter = "meter",
+}
+
+/**
+ * In the XSD, ST_Matrix3D is a whitespace separated list of numbers.
+ * The official 3MF core spec uses a 3x4 matrix (12 numbers).
+ */
+export type ST_Matrix3D = [number, number, number, number, number, number, number, number, number, number, number, number];
+
+/**
+ *
+ */
+export interface IMatrix3d {
+    /** */
+    values: ST_Matrix3D;
 }
 
 /**
@@ -195,7 +207,7 @@ export interface I3mfComponent {
      * Optional transform applied to the referenced object within the component.
      * Represented as a 3x4 matrix.
      */
-    transform?: Matrix3d;
+    transform?: IMatrix3d;
 }
 
 /**
@@ -312,7 +324,7 @@ export interface I3mfItem {
     objectid: ST_ResourceID;
 
     /** Optional placement transform (3x4). */
-    transform?: Matrix3d;
+    transform?: IMatrix3d;
 
     /** Optional part number at the build item level. */
     partnumber?: string;

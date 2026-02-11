@@ -7,8 +7,14 @@ import * as Serializers from "serializers/3MF/index";
  */
 const globalObject = typeof global !== "undefined" ? global : typeof window !== "undefined" ? window : undefined;
 if (typeof globalObject !== "undefined") {
+    const keys = [];
     for (const serializer in Serializers) {
+        // Prevent Reassignment.
+        if (keys.indexOf(serializer) > -1) {
+            continue;
+        }
         (<any>globalObject).BABYLON[serializer] = (<any>Serializers)[serializer];
+        keys.push(serializer);
     }
 }
 

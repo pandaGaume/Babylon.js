@@ -1,4 +1,5 @@
 // 3MF
+import type { Matrix3d } from "./3mf";
 import {
     ThreeMfBase,
     ThreeMfBaseMaterials,
@@ -32,8 +33,6 @@ import type {
     ST_Unit,
 } from "./3mf.interfaces";
 import { ST_ObjectType } from "./3mf.interfaces";
-import { RgbaToHex } from "./3mf.math";
-import type { Matrix3d } from "./3mf.math";
 import { ThreeMfContentType, ThreeMfContentTypes, ThreeMfDocument, ThreeMfRelationship, ThreeMfRelationships } from "./3mf.opc";
 import type { I3mfDocument } from "./3mf.opc.interfaces";
 import {
@@ -266,10 +265,10 @@ export class ThreeMfMaterialBuilder {
         this._m.base = this._m.base ?? [];
         let m = this._m.base.find((m) => m.name.toLowerCase() === name.toLowerCase());
         if (m) {
-            m.displaycolor = RgbaToHex(color);
+            m.displaycolor = this._rgbaToHex(color);
             return this;
         }
-        m = new ThreeMfBase(name, RgbaToHex(color));
+        m = new ThreeMfBase(name, this._rgbaToHex(color));
         this._m.base.push(m);
         return this;
     }
@@ -280,6 +279,24 @@ export class ThreeMfMaterialBuilder {
      */
     public build(): I3mfBaseMaterials {
         return this._m;
+    }
+
+    private _rgbaToHex(c: I3mfRGBAColor | { r: number; g: number; b: number; a?: number }): string {
+        const toSRGB = (c: number) => Math.round(Math.min(255, Math.max(0, Math.pow(c, 1 / 2.2) * 255)));
+
+        const r = toSRGB(c.r).toString(16).padStart(2, "0").toUpperCase();
+        const g = toSRGB(c.g).toString(16).padStart(2, "0").toUpperCase();
+        const b = toSRGB(c.b).toString(16).padStart(2, "0").toUpperCase();
+
+        if (typeof (c as any).a === "number") {
+            const a = Math.round(Math.min(255, Math.max(0, c.a! * 255)))
+                .toString(16)
+                .padStart(2, "0")
+                .toUpperCase();
+            return `#${r}${g}${b}${a}`;
+        }
+
+        return `#${r}${g}${b}`;
     }
 }
 

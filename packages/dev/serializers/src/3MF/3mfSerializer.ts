@@ -6,14 +6,62 @@ import { Matrix } from "core/Maths/math";
 import { Tools } from "core/Misc/tools";
 
 // 3MF
-import { IncrementalIdFactory } from "./core/model/3mf.utils";
 import { ThreeMfMeshBuilder, type ThreeMfModelBuilder } from "./core/model/3mf.builder";
-import { Matrix3d } from "./core/model/3mf.math";
+import { Matrix3d } from "./core/model/3mf";
 
 import { ST_Unit, type I3mfModel, type I3mfObject } from "./core/model/3mf.interfaces";
 import type { I3mfVertexData } from "./core/model/3mf.types";
 import { AbstractThreeMfSerializer, type IThreeMfSerializerOptions } from "./core/model/3mf.serializer";
 import { ThreeMfSerializerGlobalConfiguration } from "./3mfSerializer.configuration";
+
+/**
+ *
+ */
+class IncrementalIdFactory {
+    /** */
+    _from: number;
+    /** */
+    _to: number;
+    /** */
+    _step: number;
+    /** */
+    _i: number;
+
+    /**
+     *
+     * @param from
+     * @param to
+     * @param step
+     */
+    public constructor(from: number = 0, to: number = Number.MIN_SAFE_INTEGER, step: number = 1) {
+        this._from = from;
+        this._to = to;
+        this._step = step;
+        this._i = from;
+    }
+
+    /**
+     *
+     * @returns
+     */
+    public next(): number {
+        if (this._i < this._to) {
+            throw new Error("ST_ResourceID out of bound");
+        }
+        const v = this._i;
+        this._i += this._step;
+        return v;
+    }
+
+    /**
+     *
+     * @returns
+     */
+    public reset(): IncrementalIdFactory {
+        this._i = this._from;
+        return this;
+    }
+}
 
 /**
  * Options controlling how meshes are exported into the 3MF model.

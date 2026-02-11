@@ -1,4 +1,5 @@
-import { XmlAttr, XmlName } from "../xml/xml.interfaces";
+import { type IFormatter, XmlAttr, XmlName } from "../xml/xml.interfaces";
+import { type IXmlSerializerFormatOptions, NumberFormatter } from "../xml/xml.serializer.format";
 import type {
     I3mfBase,
     I3mfBaseMaterials,
@@ -21,9 +22,54 @@ import type {
     ST_ResourceID,
     ST_ResourceIndex,
     ST_UriReference,
+    IMatrix3d,
+    ST_Matrix3D,
 } from "./3mf.interfaces";
 import { ST_Unit, ThreeDimModelNamespace, ST_ObjectType } from "./3mf.interfaces";
-import { MatrixFormatter, type Matrix3d } from "./3mf.math";
+
+/**
+ *
+ */
+export class Matrix3d implements IMatrix3d {
+    /**
+     *
+     * @returns
+     */
+    public static Zero() {
+        return new Matrix3d([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+    /**
+     *
+     * @param values
+     */
+    public constructor(public values: ST_Matrix3D) {}
+
+    /**
+     *
+     * @returns
+     */
+    public toString(): string {
+        return this.values.join(" ");
+    }
+}
+
+/**
+ *
+ */
+export class MatrixFormatter implements IFormatter<Matrix3d> {
+    /**
+     *
+     */
+    _f: NumberFormatter;
+
+    public constructor(public o: IXmlSerializerFormatOptions) {
+        this._f = new NumberFormatter(o);
+    }
+
+    public toString(x: Matrix3d): string {
+        return x.values.map((v) => this._f.toString(v)).join(" ");
+    }
+}
 
 /**
  *
