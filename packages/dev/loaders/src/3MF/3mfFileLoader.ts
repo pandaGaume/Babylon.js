@@ -4,7 +4,8 @@ import type { Scene } from "core/scene";
 import { TmfFileLoaderMetadata } from "./3mfFileLoader.metadata";
 import { ThreeMfLoaderGlobalConfiguration } from "./3mfLoader.configuration";
 import { Tools } from "core/Misc/tools";
-import type { Mesh } from "core/Meshes";
+import { Mesh } from "core/Meshes/mesh";
+import { VertexData } from "core/Meshes/mesh.vertexData";
 import { Matrix } from "core/Maths/math";
 
 const RelationshipDirName = "_rels/";
@@ -132,10 +133,12 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
         if (childElement) {
             switch (childElement.localName) {
                 case "mesh": {
-                    const babylonMesh = this._parseMesh(childElement);
-                    if (babylonMesh) {
+                    const data = this._parseMesh(childElement);
+                    if (data) {
                         const id = el.getAttribute("id");
                         if (id) {
+                            const babylonMesh = new Mesh(id, this._babylonScene);
+                            data.applyToMesh(babylonMesh);
                             this._meshById.set(id, babylonMesh);
                         }
                     }
@@ -161,7 +164,7 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
         return Number.parseFloat(this._getRequiredAttribute(el, att));
     }
 
-    private _parseMesh(el: Element): Mesh | undefined {
+    private _parseMesh(el: Element): VertexData | undefined {
         const verticesEl = el.getElementsByTagName("vertices")[0];
         if (!verticesEl) {
             return;
@@ -188,6 +191,11 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
             indices[k++] = this._getRequiredFloatAttribute(child, "v2");
             indices[k++] = this._getRequiredFloatAttribute(child, "v3");
         }
+        const vertexData = new VertexData();
+
+        vertexData.positions = pos;
+        vertexData.indices = indices;
+        return vertexData;
     }
 
     private _parseComponents(el: Element): void {
