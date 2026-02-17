@@ -7,15 +7,64 @@ import { Tools } from "core/Misc/tools";
 import { Mesh } from "core/Meshes/mesh";
 import { VertexData } from "core/Meshes/mesh.vertexData";
 import { Matrix } from "core/Maths/math";
+import { TransformNode } from "core/Meshes/transformNode";
 
 const RelationshipDirName = "_rels/";
 const RelationshipFileName = `.rels`;
+
+interface I3mfItem {
+    /** Optional placement transform (3x4). */
+    transform?: Matrix;
+
+    /** Optional part number at the build item level. */
+    partnumber?: string;
+
+    /** Optional build-item metadata. */
+    metadatagroup?: I3mfMetadataGroup;
+}
+
+/**
+ * Generic metadata entry.
+ * Metadata can appear at the model level (<metadata>) and inside metadata groups (<metadatagroup>).
+ *
+ * Notes:
+ * - "name" is the metadata key.
+ * - "type" is optional and can be a MIME type or a schema indicator depending on usage.
+ * - "preserve" instructs consumers whether to keep metadata when modifying the model.
+ */
+export interface I3mfMetadata {
+    /** Metadata key (required). */
+    name: string;
+
+    /** If true, indicates the metadata should be preserved by consumers (optional). */
+    preserve?: boolean;
+
+    /** Optional type information for the value. */
+    type?: string;
+
+    /** Metadata value (required). */
+    value: string;
+}
+
+/**
+ * A grouping element for metadata.
+ * Used in some places where the schema allows a metadata group rather than raw metadata entries.
+ */
+export interface I3mfMetadataGroup {
+    /** The list of metadata entries contained in the group. */
+    metadata: Array<I3mfMetadata>;
+}
 
 /**
  *
  */
 export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
     private _babylonScene: Scene;
+    private _root: TransformNode;
+    private _meshById = new Map<string, Mesh>();
+    private _components = new Map<string, Array<Matrix>>();
+    private _toBuilds = new Map<string, Array<I3mfItem>>();
+
     /**
      * Cached promise so we only attempt to load fflate once.
      * This prevents multiple concurrent LoadScriptAsync calls.
@@ -65,6 +114,9 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
      */
     public async loadAsync(scene: Scene, data: Uint8Array, rootUrl: string, onProgress?: (event: ISceneLoaderProgressEvent) => void, fileName?: string): Promise<void> {
         this._babylonScene = scene;
+        this._root = new TransformNode(fileName ?? "3mfRoot", this._babylonScene);
+        this._root.setPreTransformMatrix(ThreeMfFileLoader._R_3MF_TO_BJS);
+
         const files = await this._unzipWithFflateAsync(data);
         // here we might have at least 3 documents
         // 1 - the Open Doc Declaration, which is not really useful here.
@@ -74,6 +126,7 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
         if (!relationships) {
             throw new Error("Invalid 3MF file. Missing relationships.");
         }
+
         const modelNames = Array.from(this._parseRelationships(relationships));
         for (const modelName of modelNames) {
             const modelBin = files.get(modelName);
@@ -105,6 +158,14 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
         const xml = this._uint8ArrayToXmlString(data);
         const dom = this._parseXmlToDom(xml);
 
+        const builds = dom.getElementsByTagName("builds")[0];
+        if (!builds) {
+            // The <build> element contains one or more items to manufacture as part of processing the
+            // job. A consumer MUST NOT output any 3D objects not referenced by an <item> element
+            return;
+        }
+        this._parseBuilds(builds);
+
         const objects = dom.getElementsByTagName("object");
         for (const objectElement of objects) {
             this._parseObject(objectElement);
@@ -118,14 +179,24 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
             }
             const transforms = e[1];
             for (let i = 0; i != transforms.length; i++) {
-                const newInstance = mesh.createInstance(`${mesh.name}.i${i}`);
-                newInstance.setPreTransformMatrix(transforms[i]);
+                const newInstance = mesh.createInstance(`${mesh.name}.component(${i})`);
+                const t = transforms[i];
+                if (t) {
+                    newInstance.setPreTransformMatrix(transforms[i]);
+                }
+                newInstance.parent = this._root;
             }
         }
     }
 
-    private _meshById = new Map<string, Mesh>();
-    private _components = new Map<string, Array<Matrix>>();
+    private _parseBuilds(el: Element): void {
+        // just embbed "item"
+        const childs = el.children;
+        for (const child of childs) {
+            if (child.localName === "item") {
+            }
+        }
+    }
 
     private _parseObject(el: Element): void {
         // just embbed "mesh" or "component"
@@ -137,9 +208,28 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
                     if (data) {
                         const id = el.getAttribute("id");
                         if (id) {
-                            const babylonMesh = new Mesh(id, this._babylonScene);
-                            data.applyToMesh(babylonMesh);
-                            this._meshById.set(id, babylonMesh);
+                            const builds = this._toBuilds.get(id);
+                            if (builds && builds.length) {
+                                const babylonMesh = new Mesh(`${builds[0].partnumber ?? id}`, this._babylonScene);
+                                data.applyToMesh(babylonMesh);
+                                this._meshById.set(id, babylonMesh);
+                                const t = builds[0].transform;
+                                if (t) {
+                                    babylonMesh.setPreTransformMatrix(t);
+                                }
+                                babylonMesh.parent = this._root;
+                                if (builds.length > 1) {
+                                    for (let i = 1; i != builds.length; i++) {
+                                        const name = builds[i].partnumber ? `${builds[i].partnumber}` : `${id}.build(${i})`;
+                                        const newInstance = babylonMesh.createInstance(name);
+                                        const t = builds[i].transform;
+                                        if (t) {
+                                            newInstance.setPreTransformMatrix(t);
+                                        }
+                                        newInstance.parent = this._root;
+                                    }
+                                }
+                            }
                         }
                     }
                     break;
@@ -152,8 +242,8 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
         }
     }
 
-    private _getRequiredAttribute(el: Element, att: string): string {
-        const str = el.getAttribute("x");
+    private _getRequiredAttribute(el: Element, att: string, _default?: string): string {
+        const str = el.getAttribute(att) ?? _default;
         if (!str) {
             throw new Error("Invalid document exception/ Missing attribute");
         }
@@ -330,4 +420,9 @@ export class ThreeMfFileLoader implements ISceneLoaderPluginAsync {
         const { DOMParser: NodeDomParser } = require("@xmldom/xmldom");
         return new NodeDomParser().parseFromString(xml, "application/xml");
     }
+
+    /**
+     * Basis conversion from 3MF coordinate system to the expected Babylon coordinate system.
+     */
+    private static readonly _R_3MF_TO_BJS = Matrix.Scaling(1, -1, 1).multiply(Matrix.RotationX(-Math.PI / 2));
 }
